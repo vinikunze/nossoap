@@ -1,15 +1,7 @@
 import { defineConfig } from 'vitest/config';
-import { fileURLToPath } from 'node:url';
 
+// Os testes são da lógica pura (dinheiro, resumo, validação).
+// Config própria para não subir o ambiente da Cloudflare a cada teste.
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  test: {
-    environment: 'node',
-    include: ['tests/**/*.test.ts'],
-    globals: false,
-  },
+  test: { include: ['tests/**/*.test.ts'] },
 });

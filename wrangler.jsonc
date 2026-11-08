@@ -1,0 +1,36 @@
+{
+  // Lista de compras do apartamento. Site, API e banco num Worker só.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nossoap",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  // Só o endereço principal. Endereços de pré-visualização seriam mais portas
+  // para proteger no Access, sem uso para duas pessoas.
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "not_found_handling": "single-page-application",
+    // A API passa pelo Worker; o resto (HTML, JS, CSS, ícones) sai direto do cache.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nosso-ap",
+      "database_id": "1ca5a1b0-485d-4974-88da-6b53d484d5d3",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // Segunda trava, além do Access: só estes e-mails passam pela API.
+    "EMAILS_PERMITIDOS": "vinihkunze@gmail.com,sluise981@gmail.com"
+  },
+  // Só para rodar no computador: simula o login do Access.
+  "access": {
+    "dev": {
+      "aud": "dev-local",
+      "identity": { "email": "vinihkunze@gmail.com" }
+    }
+  },
+  "observability": { "enabled": true }
+}
