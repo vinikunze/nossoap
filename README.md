@@ -86,4 +86,8 @@ MCP, registre também em `d1_migrations`.
 - **O canvas do 3D tem `width/height: 100%`.** O desenho é feito em 2× nas
   telas de alta densidade; sem esse CSS a maquete saía com o dobro do tamanho
   e cortada (aconteceu no iPhone e num notebook com zoom de 125%).
+- **`vercel.json` desliga a Vercel neste repositório.** O projeto `lua-de-mel`
+  da Vercel (o app de viagem antigo, em Next.js) continua ligado a ele e
+  falhava em todo push, porque aqui não há mais Next.js. Quem publica este app
+  é a Cloudflare (Workers Builds).
 
