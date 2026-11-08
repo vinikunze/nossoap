@@ -16,6 +16,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
@@ -45,6 +46,17 @@ const arquivos = {};
 })(raiz);
 if (!arquivos['/index.html']) throw new Error('Build sem index.html');
 
+// Versão do site: muda sempre que algum arquivo muda. O app compara a dele
+// com /versao.json e recarrega sozinho quando sai uma nova (o celular
+// guardava a página antiga aberta e mostrava a versão de antes).
+const versao = createHash('sha256')
+  .update(Object.entries(arquivos).sort().map(([k, a]) => k + a.b64).join('|'))
+  .digest('hex').slice(0, 12);
+const html = Buffer.from(arquivos['/index.html'].b64, 'base64').toString('utf8')
+  .replace('<head>', `<head>\n    <meta name="versao" content="${versao}" />`);
+arquivos['/index.html'].b64 = Buffer.from(html).toString('base64');
+arquivos['/versao.json'] = { tipo: 'application/json', b64: Buffer.from(JSON.stringify({ versao })).toString('base64') };
+
 mkdirSync('.publicar', { recursive: true });
 writeFileSync('.publicar/arquivos.js', `export const ARQUIVOS = ${JSON.stringify(arquivos)};\n`);
 writeFileSync('.publicar/entrada.ts', `// Gerado por scripts/publicar.mjs. Não editar.
@@ -73,7 +85,8 @@ export default {
     return new Response(req.method === 'HEAD' ? null : bytes(caminho), {
       headers: {
         'content-type': ARQUIVOS[caminho].tipo,
-        'cache-control': imutavel ? 'public, max-age=31536000, immutable' : 'no-cache',
+        // Página e versão nunca ficam guardadas: sempre a publicada agora.
+        'cache-control': imutavel ? 'public, max-age=31536000, immutable' : 'no-store',
         'x-content-type-options': 'nosniff',
         'referrer-policy': 'strict-origin-when-cross-origin',
       },
@@ -97,4 +110,4 @@ mkdirSync('.wrangler/deploy', { recursive: true });
 writeFileSync('.wrangler/deploy/config.json', JSON.stringify({ configPath: '../../.publicar/wrangler.json', auxiliaryWorkers: [] }));
 
 const kb = Math.round(Object.values(arquivos).reduce((t, a) => t + a.b64.length, 0) / 1024);
-console.log(`${Object.keys(arquivos).length} arquivos embutidos no Worker (${kb} KB em base64).`);
+console.log(`${Object.keys(arquivos).length} arquivos embutidos no Worker (${kb} KB em base64), versão ${versao}.`);

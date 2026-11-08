@@ -383,7 +383,7 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Na visão geral, corta tudo acima de 1,1 m, como uma planta baixa.
   if (geral) renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), ALTURA_CORTE + 0.01)];
