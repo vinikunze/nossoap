@@ -90,6 +90,13 @@ redesenhada em metros em `shared/planta.ts`.
 - Pia, vaso, box, tanque e bancadas vêm com o apartamento: aparecem sempre.
 - Cada cômodo da lista é ligado a um lugar da planta (Ajustes → editar cômodo
   → "Na planta 3D"). Cômodo criado por vocês pode ficar sem maquete.
+- **Correções da planta com o Vini (08/11/2026)**: não existe mureta no alto
+  entre a cozinha e a sala nem bancada (ilha) entre as duas; existe a parede
+  entre a lavanderia e a sala, ao lado do sofá. A porta de entrada fica no
+  alto, ao lado da mesa de jantar. Portas desenhadas abertas, com o arco no
+  chão (entrada, banheiro, quarto de casal, quarto de visita); janelas em azul
+  na lavanderia, sala, banheiro e nos dois quartos. Tudo em `PORTAS` e
+  `JANELAS` em `shared/planta.ts`.
 - O Three.js só é baixado quando a maquete aparece (145 KB comprimido); a
   lista sozinha tem 40 KB.
 

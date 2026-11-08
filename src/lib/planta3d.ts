@@ -16,8 +16,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  AREAS, PAREDES, CIRCULACAO, LARGURA, FUNDO, distribuir, situacao,
-  type Area, type AreaId, type Peca, type Ret, type Frente,
+  AREAS, PAREDES, PORTAS, JANELAS, CIRCULACAO, LARGURA, FUNDO, distribuir, situacao,
+  type Area, type AreaId, type Peca, type Ret, type Frente, type Porta,
 } from '../../shared/planta';
 import type { Item } from '../../shared/tipos';
 
@@ -71,7 +71,10 @@ const COR = {
   terracota: 0xb86b4b,
   espelho: 0xc9d6e0,
   vidro: 0xbfd9e6,
+  janela: 0x5aa9c2, // o traço azul-esverdeado das janelas na planta
 };
+
+const ALTURA_PORTA = 2.1;
 
 const ALTURA_PAREDE = 2.5;
 const ALTURA_CORTE = 1.1;
@@ -458,46 +461,134 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
   if (geral) piso(CIRCULACAO, COR.madeiraPiso);
 
   // Paredes: no cômodo, só as que encostam nele, cortadas no tamanho dele.
+  // Cada parede é cortada nas janelas: parede até o peitoril, vidro, parede
+  // em cima. Na visão geral (corte a 1,1 m) a janela aparece como um trecho
+  // de vidro com o topo azul, igual ao traço da planta.
   const alturaParede = geral ? ALTURA_CORTE : ALTURA_PAREDE;
   const corte = new THREE.MeshStandardMaterial({ color: COR.corte, roughness: 0.9 });
+  const vidroJanela = () => material(COR.vidro, { transparent: true, opacity: 0.45, roughness: 0.1, depthWrite: false });
+  const topoJanela = () => material(COR.janela, { side: THREE.FrontSide, transparent: true });
+
+  /** Bloco ao longo da parede: de u0 a u1, da altura y0 até y1. */
+  function bloco(horizontal: boolean, linha: number, u0: number, u1: number, y0: number, y1: number, m: THREE.Material, grosso = ESPESSURA) {
+    const c = u1 - u0;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(horizontal ? c : grosso, y1 - y0, horizontal ? grosso : c), m);
+    const meio = (u0 + u1) / 2;
+    mesh.position.set(horizontal ? meio : linha, (y0 + y1) / 2, horizontal ? linha : meio);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mundo.add(mesh);
+    return mesh;
+  }
+
+  /** Janelas da mesma linha, recortadas no trecho [ua, ub]. */
+  function janelasDa(horizontal: boolean, linha: number, ua: number, ub: number) {
+    return JANELAS.flatMap((j) => {
+      const [x1, z1, x2, z2] = j.trecho;
+      if (horizontal !== (z1 === z2)) return [];
+      if (Math.abs((horizontal ? z1 : x1) - linha) > 0.01) return [];
+      const j0 = Math.max(ua, horizontal ? Math.min(x1, x2) : Math.min(z1, z2));
+      const j1 = Math.min(ub, horizontal ? Math.max(x1, x2) : Math.max(z1, z2));
+      return j1 - j0 > 0.05 ? [{ de: j0, ate: j1, peitoril: j.peitoril }] : [];
+    }).sort((p, q) => p.de - q.de);
+  }
+
+  /** Trecho [ua, ub] de parede está no cômodo em foco? Devolve o trecho recortado. */
+  function noFoco(horizontal: boolean, linha: number, ua: number, ub: number): [number, number] | null {
+    if (!areaFoco) return [ua, ub];
+    const r = areaFoco.ret;
+    const [l0, l1, c0, c1] = horizontal ? [r.z, r.z + r.d, r.x, r.x + r.w] : [r.x, r.x + r.w, r.z, r.z + r.d];
+    if (linha < l0 - 0.01 || linha > l1 + 0.01) return null;
+    const a = Math.max(ua, c0), b = Math.min(ub, c1);
+    return b - a < 0.05 ? null : [a, b];
+  }
+
   for (const [x1, z1, x2, z2] of PAREDES) {
-    let a = { x: Math.min(x1, x2), z: Math.min(z1, z2) };
-    let b = { x: Math.max(x1, x2), z: Math.max(z1, z2) };
     const horizontal = z1 === z2;
-    if (areaFoco) {
-      const r = areaFoco.ret;
-      if (horizontal) {
-        if (a.z < r.z - 0.01 || a.z > r.z + r.d + 0.01) continue;
-        a = { x: Math.max(a.x, r.x), z: a.z };
-        b = { x: Math.min(b.x, r.x + r.w), z: b.z };
-        if (b.x - a.x < 0.05) continue;
+    const linha = horizontal ? z1 : x1;
+    const trecho = noFoco(horizontal, linha, horizontal ? Math.min(x1, x2) : Math.min(z1, z2), horizontal ? Math.max(x1, x2) : Math.max(z1, z2));
+    if (!trecho) continue;
+    // As pontas avançam meia espessura para fechar os cantos.
+    const ua = trecho[0] - ESPESSURA / 2, ub = trecho[1] + ESPESSURA / 2;
+    const meshes: THREE.Mesh[] = [];
+    let u = ua;
+    const cheia = (u0: number, u1: number) => {
+      if (u1 - u0 < 0.01) return;
+      meshes.push(bloco(horizontal, linha, u0, u1, 0, alturaParede, material(COR.parede, { side: THREE.FrontSide, transparent: true })));
+      meshes.push(bloco(horizontal, linha, u0, u1, alturaParede - 0.03, alturaParede + 0.001, corte.clone(), ESPESSURA + 0.002));
+    };
+    for (const j of janelasDa(horizontal, linha, ua, ub)) {
+      cheia(u, j.de);
+      const peitoril = geral ? 0.7 : j.peitoril;
+      const topoVidro = geral ? alturaParede : ALTURA_PORTA;
+      meshes.push(bloco(horizontal, linha, j.de, j.ate, 0, peitoril, material(COR.parede, { side: THREE.FrontSide, transparent: true })));
+      const v = bloco(horizontal, linha, j.de, j.ate, peitoril, topoVidro, vidroJanela(), 0.04);
+      v.castShadow = false;
+      meshes.push(v);
+      if (geral) {
+        meshes.push(bloco(horizontal, linha, j.de, j.ate, alturaParede - 0.03, alturaParede + 0.001, topoJanela(), ESPESSURA + 0.002));
       } else {
-        if (a.x < r.x - 0.01 || a.x > r.x + r.w + 0.01) continue;
-        a = { x: a.x, z: Math.max(a.z, r.z) };
-        b = { x: b.x, z: Math.min(b.z, r.z + r.d) };
-        if (b.z - a.z < 0.05) continue;
+        meshes.push(bloco(horizontal, linha, j.de, j.ate, ALTURA_PORTA, alturaParede, material(COR.parede, { side: THREE.FrontSide, transparent: true })));
+        meshes.push(bloco(horizontal, linha, j.de, j.ate, alturaParede - 0.03, alturaParede + 0.001, corte.clone(), ESPESSURA + 0.002));
       }
+      u = j.ate;
     }
-    const comprimento = (horizontal ? b.x - a.x : b.z - a.z) + ESPESSURA;
-    const w = horizontal ? comprimento : ESPESSURA;
-    const d = horizontal ? ESPESSURA : comprimento;
-    const mParede = material(COR.parede, { side: THREE.FrontSide, transparent: true });
-    const corpo = new THREE.Mesh(new THREE.BoxGeometry(w, alturaParede, d), mParede);
-    const meioX = (a.x + b.x) / 2;
-    const meioZ = (a.z + b.z) / 2;
-    corpo.position.set(meioX, alturaParede / 2, meioZ);
-    corpo.castShadow = true;
-    corpo.receiveShadow = true;
-    const topo = new THREE.Mesh(new THREE.BoxGeometry(w + 0.002, 0.03, d + 0.002), corte.clone());
-    topo.position.set(meioX, alturaParede - 0.014, meioZ);
-    (topo.material as THREE.Material).transparent = true;
-    mundo.add(corpo, topo);
+    cheia(u, ub);
+    const meio = (trecho[0] + trecho[1]) / 2;
     paredes.push({
-      meshes: [corpo, topo],
-      meio: new THREE.Vector2(meioX, meioZ),
+      meshes,
+      meio: new THREE.Vector2(horizontal ? meio : linha, horizontal ? linha : meio),
       normal: horizontal ? new THREE.Vector2(0, 1) : new THREE.Vector2(1, 0),
     });
   }
+
+  // Portas: folha aberta a 90° e o arco de abertura no chão, como na planta.
+  // No cômodo, também a parede em cima do vão (verga).
+  const arcoMat = new THREE.MeshBasicMaterial({ color: COR.marinho, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+  function porta(p: Porta) {
+    const horizontal = p.eixo === 'x';
+    const largura = p.ate - p.de;
+    const u = p.dobradica === 'inicio' ? p.de : p.ate;
+    // Dobradiça no mundo e as duas direções: fechada (ao longo do vão) e aberta (para dentro do cômodo).
+    const hx = horizontal ? u : p.linha, hz = horizontal ? p.linha : u;
+    const sentido = p.dobradica === 'inicio' ? 1 : -1;
+    const fechada = horizontal ? [sentido, 0] : [0, sentido];
+    const aberta = horizontal ? [0, p.abre] : [p.abre, 0];
+    const entrada = p.id === 'entrada';
+    const folha = new THREE.Mesh(new THREE.BoxGeometry(0.04, ALTURA_PORTA, largura - 0.04), entrada ? mats.madeiraEscura : mats.madeira);
+    folha.position.set(hx + aberta[0] * (largura / 2) + fechada[0] * 0.03, ALTURA_PORTA / 2, hz + aberta[1] * (largura / 2) + fechada[1] * 0.03);
+    if (aberta[0] !== 0) folha.rotation.y = Math.PI / 2;
+    folha.castShadow = true;
+    mundo.add(folha);
+    if (entrada) {
+      const macaneta = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.14), mats.dourado);
+      macaneta.position.set(hx + aberta[0] * (largura - 0.12) + fechada[0] * 0.06, 1.0, hz + aberta[1] * (largura - 0.12) + fechada[1] * 0.06);
+      if (aberta[0] !== 0) macaneta.rotation.y = Math.PI / 2;
+      mundo.add(macaneta);
+    }
+    // Arco de um quarto de volta, da posição fechada até a aberta.
+    const angulo = (d: number[]) => Math.atan2(-d[1], d[0]);
+    let a1 = angulo(fechada), a2 = angulo(aberta);
+    let dif = a2 - a1;
+    while (dif > Math.PI) dif -= 2 * Math.PI;
+    while (dif < -Math.PI) dif += 2 * Math.PI;
+    const inicio = dif > 0 ? a1 : a2;
+    const arco = new THREE.Mesh(new THREE.RingGeometry(largura - 0.025, largura, 40, 1, inicio, Math.abs(dif)), arcoMat);
+    arco.rotation.x = -Math.PI / 2;
+    arco.position.set(hx, 0.006, hz);
+    mundo.add(arco);
+    if (!geral) {
+      const verga = bloco(horizontal, p.linha, p.de, p.ate, ALTURA_PORTA, alturaParede, material(COR.parede, { side: THREE.FrontSide, transparent: true }));
+      const topo = bloco(horizontal, p.linha, p.de, p.ate, alturaParede - 0.03, alturaParede + 0.001, corte.clone(), ESPESSURA + 0.002);
+      const meio = (p.de + p.ate) / 2;
+      paredes.push({
+        meshes: [verga, topo],
+        meio: new THREE.Vector2(horizontal ? meio : p.linha, horizontal ? p.linha : meio),
+        normal: horizontal ? new THREE.Vector2(0, 1) : new THREE.Vector2(1, 0),
+      });
+    }
+  }
+  for (const p of PORTAS) if (noFoco(p.eixo === 'x', p.linha, p.de, p.ate)) porta(p);
 
   // Peças fixas (vêm com o apartamento).
   for (const a of areasVisiveis) for (const p of a.pecas) if (p.fixa) mundo.add(construirPeca(p, mats));
@@ -694,7 +785,13 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
       camadaRotulos.appendChild(b);
       rotulos.set(a.id, b);
     }
+    rotuloEntrada = document.createElement('span');
+    rotuloEntrada.className = 'rotulo3d entrada3d';
+    rotuloEntrada.textContent = 'Entrada';
+    camadaRotulos.appendChild(rotuloEntrada);
   }
+  let rotuloEntrada: HTMLSpanElement | null = null;
+  const ENTRADA = PORTAS.find((p) => p.id === 'entrada')!;
 
   const ponto = new THREE.Vector3();
   function posicionarRotulos() {
@@ -702,6 +799,13 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     const h = host.clientHeight;
     // Um nome não pode cobrir outro: quem bate desce até achar espaço.
     const postos: { x: number; y: number; w: number; h: number }[] = [];
+    if (rotuloEntrada) {
+      // Do lado de fora, logo em frente à porta.
+      ponto.set((ENTRADA.de + ENTRADA.ate) / 2 - LARGURA / 2, 0.1, ENTRADA.linha - 0.45 - FUNDO / 2).project(camera);
+      const x = ((ponto.x + 1) / 2) * w, y = ((1 - ponto.y) / 2) * h;
+      rotuloEntrada.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+      postos.push({ x, y, w: rotuloEntrada.offsetWidth + 6, h: rotuloEntrada.offsetHeight + 4 });
+    }
     for (const a of AREAS) {
       const b = rotulos.get(a.id);
       if (!b) continue;

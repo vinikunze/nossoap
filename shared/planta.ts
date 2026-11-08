@@ -64,10 +64,17 @@ export interface Area {
 export const LARGURA = 11.2;
 export const FUNDO = 6.15;
 
-/** Paredes: segmentos [x1, z1, x2, z2]. Os vãos de porta já estão abertos. */
+/**
+ * Paredes: segmentos [x1, z1, x2, z2]. Os vãos das portas já estão abertos.
+ * Conferido com o Vini em 08/11/2026 sobre a imagem da planta: não existe
+ * mureta no alto entre a cozinha e a sala nem bancada (ilha) entre as duas;
+ * existe a parede entre a lavanderia e a sala, ao lado do sofá; a porta de
+ * entrada fica no alto, ao lado da mesa de jantar.
+ */
 export const PAREDES: [number, number, number, number][] = [
   // contorno
-  [0, 0, 8.2, 0],
+  [0, 0, 2.5, 0], // cozinha, até a porta de entrada
+  [3.45, 0, 8.2, 0], // sala e banheiro (entrada de 2,50 a 3,45)
   [8.2, 0, 8.2, 1.85],
   [8.2, 1.85, 11.2, 1.85],
   [11.2, 1.85, 11.2, 6.15],
@@ -76,12 +83,52 @@ export const PAREDES: [number, number, number, number][] = [
   [5.25, 4.6, 0, 4.6],
   [0, 4.6, 0, 0],
   // internas
-  [2.45, 0, 2.45, 1.0], // mureta entre a cozinha e a sala
+  [2.45, 3.25, 2.45, 4.6], // lavanderia × sala, ao lado do sofá
   [5.25, 0, 5.25, 1.85], // banheiro × sala
   [6.1, 1.85, 8.2, 1.85], // banheiro × circulação (porta de 5,25 a 6,10)
   [6.1, 2.85, 8.2, 2.85], // quarto 02 × circulação (porta de 5,25 a 6,10)
   [5.25, 2.85, 5.25, 4.6], // sala × quarto 02
   [8.2, 2.85, 8.2, 6.15], // quarto 02 × quarto 01 (porta do quarto 01 de 1,85 a 2,85)
+];
+
+export interface Porta {
+  id: string;
+  nome: string;
+  /** Parede em que está: 'x' = parede deitada (z fixo), 'z' = parede em pé (x fixo). */
+  eixo: 'x' | 'z';
+  /** O z (eixo 'x') ou o x (eixo 'z') da parede. */
+  linha: number;
+  /** Começo e fim do vão, ao longo da parede. */
+  de: number;
+  ate: number;
+  /** A dobradiça fica no começo ou no fim do vão. */
+  dobradica: 'inicio' | 'fim';
+  /** Para que lado abre: +1 = para +z (ou +x), -1 = para -z (ou -x). */
+  abre: 1 | -1;
+}
+
+/** Portas, com a folha desenhada aberta e o arco no chão, como na planta. */
+export const PORTAS: Porta[] = [
+  { id: 'entrada', nome: 'Entrada', eixo: 'x', linha: 0, de: 2.5, ate: 3.45, dobradica: 'inicio', abre: 1 },
+  { id: 'bwc', nome: 'Banheiro', eixo: 'x', linha: 1.85, de: 5.28, ate: 6.08, dobradica: 'inicio', abre: -1 },
+  { id: 'quarto2', nome: 'Quarto 02', eixo: 'x', linha: 2.85, de: 5.28, ate: 6.08, dobradica: 'inicio', abre: 1 },
+  { id: 'quarto1', nome: 'Quarto 01', eixo: 'z', linha: 8.2, de: 1.9, ate: 2.8, dobradica: 'inicio', abre: 1 },
+];
+
+export interface Janela {
+  /** Trecho de parede [x1, z1, x2, z2] que vira janela. */
+  trecho: [number, number, number, number];
+  /** Altura do peitoril (do chão até o vidro). */
+  peitoril: number;
+}
+
+/** Janelas, onde a imagem da planta mostra os traços azul-esverdeados. */
+export const JANELAS: Janela[] = [
+  { trecho: [0.6, 4.6, 1.7, 4.6], peitoril: 1.1 }, // área de serviço
+  { trecho: [3.0, 4.6, 4.5, 4.6], peitoril: 0.9 }, // sala
+  { trecho: [8.2, 0.6, 8.2, 1.15], peitoril: 1.5 }, // banheiro
+  { trecho: [6.1, 6.15, 7.3, 6.15], peitoril: 1.0 }, // quarto 02
+  { trecho: [8.85, 6.15, 10.15, 6.15], peitoril: 1.0 }, // quarto 01
 ];
 
 /** Corredor entre a sala e os quartos. Não é cômodo da lista. */
@@ -103,9 +150,8 @@ export const AREAS: Area[] = [
       { id: 'bancada2', modelo: 'bancada', ret: { x: 0.04, z: 2.15, w: 0.6, d: 1.15 }, h: 0.9, frente: 'x+', fixa: true, pia: true },
       { id: 'microondas', modelo: 'microondas', ret: { x: 0.08, z: 0.85, w: 0.4, d: 0.52 }, y: 0.9, h: 0.3, frente: 'x+', chaves: ['micro'] },
       { id: 'armario', modelo: 'armario_aereo', ret: { x: 0.04, z: 0.75, w: 0.35, d: 2.55 }, y: 1.5, h: 0.7, frente: 'x+', chaves: ['armario', 'paneleiro'] },
-      { id: 'peninsula', modelo: 'bancada', ret: { x: 1.95, z: 1.9, w: 0.5, d: 1.45 }, h: 0.9, frente: 'x-', fixa: true },
     ],
-    apoio: { x: 1.99, z: 1.95, w: 0.42, d: 1.35, y: 0.9 },
+    apoio: { x: 1.2, z: 2.3, w: 1.0, d: 0.9, y: 0 },
   },
   {
     id: 'servico',
@@ -133,7 +179,7 @@ export const AREAS: Area[] = [
       { id: 'rack', modelo: 'rack', ret: { x: 4.85, z: 2.95, w: 0.36, d: 1.4 }, h: 0.5, frente: 'x-', chaves: ['rack', 'painel', 'aparador', 'estante'] },
       { id: 'tv', modelo: 'tv', ret: { x: 5.05, z: 3.05, w: 0.08, d: 1.2 }, y: 0.55, h: 0.7, frente: 'x-', chaves: ['tv', 'televis', 'smart tv'] },
       { id: 'luminaria', modelo: 'luminaria', ret: { x: 2.58, z: 2.08, w: 0.36, d: 0.36 }, h: 1.6, chaves: LUZ },
-      { id: 'cortina', modelo: 'cortina', ret: { x: 2.75, z: 4.48, w: 2.3, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
+      { id: 'cortina', modelo: 'cortina', ret: { x: 2.85, z: 4.48, w: 1.85, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
       { id: 'planta', modelo: 'planta', ret: { x: 4.85, z: 4.1, w: 0.34, d: 0.34 }, h: 0.95, chaves: ['planta', 'vaso de planta'] },
       { id: 'quadro', modelo: 'quadro', ret: { x: 2.51, z: 2.9, w: 0.04, d: 1.1 }, y: 1.35, h: 0.6, frente: 'x+', chaves: ['quadro'] },
     ],
@@ -166,7 +212,7 @@ export const AREAS: Area[] = [
       { id: 'cadeira', modelo: 'cadeira', ret: { x: 6.95, z: 4.1, w: 0.5, d: 0.5 }, h: 0.95, frente: 'x+', chaves: ['cadeira', 'poltrona'] },
       { id: 'luminaria', modelo: 'luminaria', ret: { x: 7.7, z: 3.82, w: 0.2, d: 0.2 }, y: 0.76, h: 0.42, chaves: LUZ },
       { id: 'tapete', modelo: 'tapete', ret: { x: 6.45, z: 4.35, w: 0.95, d: 1.35 }, h: 0.015, chaves: ['tapete'] },
-      { id: 'cortina', modelo: 'cortina', ret: { x: 5.6, z: 6.03, w: 2.3, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
+      { id: 'cortina', modelo: 'cortina', ret: { x: 5.95, z: 6.03, w: 1.5, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
     ],
     apoio: { x: 6.5, z: 5.25, w: 0.95, d: 0.7, y: 0 },
   },
@@ -184,7 +230,7 @@ export const AREAS: Area[] = [
       { id: 'tv', modelo: 'tv', ret: { x: 8.28, z: 3.75, w: 0.06, d: 1.0 }, y: 1.15, h: 0.6, frente: 'x+', chaves: ['tv', 'televis', 'smart tv'] },
       { id: 'tapete', modelo: 'tapete', ret: { x: 8.85, z: 3.4, w: 0.6, d: 1.9 }, h: 0.015, chaves: ['tapete'] },
       { id: 'espelho', modelo: 'espelho', ret: { x: 8.28, z: 5.35, w: 0.04, d: 0.5 }, y: 0.35, h: 1.5, frente: 'x+', chaves: ['espelho'] },
-      { id: 'cortina', modelo: 'cortina', ret: { x: 9.0, z: 6.03, w: 2.0, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
+      { id: 'cortina', modelo: 'cortina', ret: { x: 8.7, z: 6.03, w: 1.6, d: 0.08 }, h: 2.3, frente: 'z-', chaves: CORTINA },
     ],
     apoio: { x: 9.3, z: 5.35, w: 1.4, d: 0.6, y: 0 },
   },

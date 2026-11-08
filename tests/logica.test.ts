@@ -127,7 +127,7 @@ describe('sugestões', () => {
   });
 });
 
-import { AREAS, area, pecaDoItem, distribuir, situacao, PAREDES, LARGURA, FUNDO } from '../shared/planta';
+import { AREAS, area, pecaDoItem, distribuir, situacao, PAREDES, PORTAS, JANELAS, LARGURA, FUNDO } from '../shared/planta';
 
 describe('planta', () => {
   const peca = (a: string, nome: string) => pecaDoItem(area(a)!, nome)?.id;
@@ -182,5 +182,24 @@ describe('planta', () => {
       expect(dentro(a.apoio), `${a.id}/apoio`).toBe(true);
     }
     for (const [x1, z1, x2, z2] of PAREDES) expect(x1 === x2 || z1 === z2).toBe(true);
+  });
+
+  it('nenhuma parede atravessa uma porta, e toda janela fica numa parede', () => {
+    const naLinha = (p: (typeof PAREDES)[number], eixo: 'x' | 'z', linha: number) =>
+      eixo === 'x' ? p[1] === p[3] && Math.abs(p[1] - linha) < 1e-9 : p[0] === p[2] && Math.abs(p[0] - linha) < 1e-9;
+    for (const porta of PORTAS) {
+      for (const p of PAREDES.filter((x) => naLinha(x, porta.eixo, porta.linha))) {
+        const [a, b] = porta.eixo === 'x' ? [Math.min(p[0], p[2]), Math.max(p[0], p[2])] : [Math.min(p[1], p[3]), Math.max(p[1], p[3])];
+        expect(b <= porta.de + 1e-9 || a >= porta.ate - 1e-9, `parede ${p} atravessa a porta ${porta.id}`).toBe(true);
+      }
+    }
+    for (const j of JANELAS) {
+      const [x1, z1, x2, z2] = j.trecho;
+      const parede = PAREDES.find((p) =>
+        z1 === z2
+          ? p[1] === p[3] && p[1] === z1 && Math.min(p[0], p[2]) <= Math.min(x1, x2) && Math.max(p[0], p[2]) >= Math.max(x1, x2)
+          : p[0] === p[2] && p[0] === x1 && Math.min(p[1], p[3]) <= Math.min(z1, z2) && Math.max(p[1], p[3]) >= Math.max(z1, z2));
+      expect(parede, `janela ${j.trecho}`).toBeDefined();
+    }
   });
 });

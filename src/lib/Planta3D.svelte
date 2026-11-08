@@ -202,7 +202,8 @@
   .palco :global(.rotulo3d strong) { overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-semi); }
   .palco :global(.rotulo3d span) { color: var(--dourado-claro); font-weight: var(--fw-bold); }
   .palco :global(.rotulo3d:hover:not(:disabled)) { background: var(--marinho-forte); }
-  .palco :global(.rotulo3d:disabled) { background: rgb(255 255 255 / 0.9); color: var(--texto-3); box-shadow: none; cursor: default; }
+  .palco :global(.rotulo3d.entrada3d) { background: var(--dourado-claro); color: var(--marinho-forte); font-weight: var(--fw-bold); pointer-events: none; }
+    .palco :global(.rotulo3d:disabled) { background: rgb(255 255 255 / 0.9); color: var(--texto-3); box-shadow: none; cursor: default; }
   .palco :global(.dica3d) {
     position: absolute;
     top: 0;
