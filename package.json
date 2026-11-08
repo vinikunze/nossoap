@@ -4,11 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/embutir.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy",
     "db:local": "wrangler d1 migrations apply nosso-ap --local",
     "db:remote": "wrangler d1 migrations apply nosso-ap --remote"
   },

@@ -6,6 +6,8 @@ export class ErroApi extends Error {
   }
 }
 
+const RECARREGOU = 'nossoap:recarregou';
+
 async function pedir<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
   let r: Response;
   try {
@@ -21,9 +23,16 @@ async function pedir<T>(metodo: string, caminho: string, corpo?: unknown): Promi
     throw new ErroApi(0, 'Sem conexão. Confira a internet e tente de novo.');
   }
   if (r.type === 'opaqueredirect' || r.status === 401) {
-    // Sessão do Access expirou: recarregar leva para o login.
-    location.reload();
-    throw new ErroApi(401, 'Sessão expirada.');
+    // Sessão do Access expirou: recarregar leva para o login. Uma vez só por
+    // minuto: se o login não chega na API, recarregar de novo viraria um laço
+    // sem fim (foi o que aconteceu na primeira publicação, em 08/11/2026).
+    const ultima = Number(sessionStorage.getItem(RECARREGOU) ?? 0);
+    if (Date.now() - ultima > 60_000) {
+      sessionStorage.setItem(RECARREGOU, String(Date.now()));
+      location.reload();
+      throw new ErroApi(401, 'Entrando de novo…');
+    }
+    throw new ErroApi(401, 'Não deu para confirmar o seu login. Toque em Sair e entre de novo com o código do e-mail.');
   }
   const dados = await r.json().catch(() => ({}));
   if (!r.ok) throw new ErroApi(r.status, (dados as { erro?: string }).erro ?? 'Algo deu errado.');

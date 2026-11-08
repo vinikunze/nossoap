@@ -41,12 +41,20 @@ Banco D1 `nosso-ap` (`1ca5a1b0-485d-4974-88da-6b53d484d5d3`) já criado, com a
 migração `0001` aplicada. Endereço previsto:
 **https://nossoap.vinihkunze.workers.dev**.
 
-**Pelo painel (recomendado):** Workers Builds ligado ao GitHub, raiz `/`,
-build `npm run build`, deploy `npx wrangler deploy`. Cada push publica.
-Depois, proteger o endereço no Access com os dois e-mails (ver `ESPEC.md`).
+**Pelo painel (é o que está ligado):** Workers Builds no Worker `nossoap`,
+branch `claude/stoic-galileo-l3n991`, raiz `/`, build `npm run build`, deploy
+`npx wrangler deploy`. Cada push publica. O login é o Access do próprio Worker
+(aba **Access**), com os dois e-mails.
 
-**Da sessão do Claude:** `node scripts/publicar.mjs` com `CLOUDFLARE_API_TOKEN`
-e `CLOUDFLARE_ACCOUNT_ID`, se a rede da sessão alcançar `api.cloudflare.com`.
+**O site vai embutido dentro do Worker** (`scripts/embutir.mjs`, que roda no
+fim do `npm run build`). Servido como "arquivos estáticos", a Cloudflare põe um
+Worker roteador na frente e ele não repassa o login (`ctx.access`) para a API:
+o app ficava em "Sessão expirada". O `embutir.mjs` também aponta o
+`wrangler deploy` para `.publicar/wrangler.json`. No computador, `npm run dev`
+continua normal.
+
+**De outro lugar:** `node scripts/publicar.mjs` com `CLOUDFLARE_API_TOKEN` e
+`CLOUDFLARE_ACCOUNT_ID`.
 
 **Mudança no banco** não é aplicada pelo deploy. Crie `migrations/000N_nome.sql`
 e aplique no remoto (MCP da Cloudflare ou `npm run db:remote`). Ao aplicar pelo

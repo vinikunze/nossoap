@@ -96,7 +96,13 @@
 
     <main>
       {#if erroInicial}
-        <p class="cartao vazio" role="alert">{erroInicial}</p>
+        <div class="cartao erro-inicial" role="alert">
+          <p>{erroInicial}</p>
+          <div class="botoes-erro">
+            <button class="botao" onclick={() => location.reload()}>Tentar de novo</button>
+            <a class="botao secundario" href="/cdn-cgi/access/logout">Sair</a>
+          </div>
+        </div>
       {:else if !pronto}
         <p class="vazio">Carregando…</p>
       {:else if rota.tela === 'inicio'}
@@ -169,6 +175,8 @@
   .marca, .palavra { color: var(--marinho); letter-spacing: -0.03em; }
   .ponto { color: var(--dourado); }
   .so-computador { display: none !important; }
+  .erro-inicial { display: grid; gap: var(--esp-4); color: var(--texto-2); }
+  .botoes-erro { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
 
   .inferior {
     position: fixed;
