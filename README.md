@@ -39,7 +39,7 @@ no computador.
 
 Banco D1 `nosso-ap` (`1ca5a1b0-485d-4974-88da-6b53d484d5d3`) já criado, com a
 migração `0001` aplicada. Endereço previsto:
-**https://nosso-ap.vinihkunze.workers.dev**.
+**https://nossoap.vinihkunze.workers.dev**.
 
 **Pelo painel (recomendado):** Workers Builds ligado ao GitHub, raiz `/`,
 build `npm run build`, deploy `npx wrangler deploy`. Cada push publica.

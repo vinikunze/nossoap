@@ -152,7 +152,7 @@ no app de finanças.
      Build: `npm run build`. Deploy: `npx wrangler deploy`. Raiz: `/`.
      Branch de produção: a que tiver este código.
   2. Zero Trust → Access → Applications → Add → Self-hosted: domínio
-     `nosso-ap.vinihkunze.workers.dev`, política "Allow" com os dois e-mails,
+     `nossoap.vinihkunze.workers.dev`, política "Allow" com os dois e-mails,
      login por código no e-mail (One-time PIN).
   3. Abrir o endereço no celular e "Adicionar à tela de início".
 - Sem o passo 2 o site abre, mas a API recusa tudo (não há login), então

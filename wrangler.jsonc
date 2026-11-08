@@ -1,7 +1,7 @@
 {
   // Lista de compras do apartamento. Site, API e banco num Worker só.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nosso-ap",
+  "name": "nossoap",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-11-01",
   // Só o endereço principal. Endereços de pré-visualização seriam mais portas
