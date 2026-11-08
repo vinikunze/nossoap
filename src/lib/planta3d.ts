@@ -40,6 +40,10 @@ export interface Opcoes {
 
 export interface Planta {
   atualizar(areas: InfoArea[]): void;
+  /** fator < 1 aproxima, > 1 afasta. */
+  aproximar(fator: number): void;
+  /** Volta para a vista inicial. */
+  recentrar(): void;
   destruir(): void;
 }
 
@@ -384,8 +388,12 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
   // Na visão geral, corta tudo acima de 1,1 m, como uma planta baixa.
   if (geral) renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), ALTURA_CORTE + 0.01)];
   const tela = renderer.domElement;
+  // O desenho é feito na resolução da tela (2× no celular), mas ocupa
+  // exatamente a moldura. Sem isto, em tela de alta densidade a maquete saía
+  // com o dobro do tamanho e cortada (visto no iPhone do Vini, 08/11/2026).
   tela.style.display = 'block';
-  tela.style.touchAction = 'none';
+  tela.style.width = '100%';
+  tela.style.height = '100%';
   host.appendChild(tela);
 
   const camadaRotulos = document.createElement('div');
@@ -561,11 +569,25 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
 
   // ---------- câmera ----------
 
+  // A rodinha do mouse rola a PÁGINA, não a maquete: senão quem rola a tela
+  // inicial fica preso no 3D. Zoom com Ctrl + rodinha (é também o que a pinça
+  // do trackpad manda) ou nos botões + e −. Registrado em captura, antes dos
+  // controles, para barrar o zoom deles.
+  function aoRolar(e: WheelEvent) {
+    if (!e.ctrlKey && !e.metaKey) e.stopImmediatePropagation();
+  }
+  tela.addEventListener('wheel', aoRolar, { capture: true });
+
   const controles = new OrbitControls(camera, tela);
+  // No toque: deslizar para cima/baixo rola a página; para os lados gira a
+  // maquete; dois dedos dão zoom. (Os controles põem 'none', que prendia a
+  // página inteira quando o dedo começava em cima da maquete.)
+  tela.style.touchAction = 'pan-y';
   controles.enableDamping = true;
   controles.dampingFactor = 0.08;
   controles.enablePan = false;
-  controles.rotateSpeed = 0.6;
+  // Mais devagar no toque: um arrasto de meia tela gira cerca de 90°.
+  controles.rotateSpeed = matchMedia('(pointer: coarse)').matches ? 0.4 : 0.6;
   controles.minPolarAngle = 0.12;
   controles.maxPolarAngle = 1.2;
 
@@ -824,10 +846,16 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     dica.hidden = true;
   }
 
+  // O navegador assumiu o gesto (rolagem da página): não é um toque.
+  function aoCancelar() {
+    inicioToque = null;
+  }
+
   tela.addEventListener('pointermove', aoMover);
   tela.addEventListener('pointerdown', aoApertar);
   tela.addEventListener('pointerup', aoSoltar);
   tela.addEventListener('pointerleave', aoSair);
+  tela.addEventListener('pointercancel', aoCancelar);
 
   const observador = new ResizeObserver(ajustarTamanho);
   observador.observe(host);
@@ -842,8 +870,29 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
       montarRotulos();
       montarLista();
     },
+    aproximar(fator) {
+      const v = camera.position.clone().sub(controles.target);
+      v.setLength(THREE.MathUtils.clamp(v.length() * fator, controles.minDistance, controles.maxDistance));
+      camera.position.copy(controles.target).add(v);
+      mexeu = true;
+      entrada = 1;
+      controles.update();
+      pedirQuadro();
+    },
+    recentrar() {
+      mexeu = false;
+      entrada = 1;
+      controles.target.copy(alvo);
+      azimute = escolherAzimute();
+      distancia = distanciaIdeal();
+      posicionar(distancia);
+      controles.update();
+      pedirQuadro();
+    },
     destruir() {
       parado = true;
+      tela.removeEventListener('wheel', aoRolar, { capture: true });
+      tela.removeEventListener('pointercancel', aoCancelar);
       observador.disconnect();
       controles.dispose();
       tela.removeEventListener('pointermove', aoMover);

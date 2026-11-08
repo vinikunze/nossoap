@@ -78,3 +78,12 @@ MCP, registre também em `d1_migrations`.
   para código malicioso.
 - **Sem service worker**, pelo mesmo motivo do app de finanças: o Access
   redireciona para o login e um cache offline no meio disso dá tela em branco.
+- **A maquete não briga com a página.** No celular, deslizar para cima ou para
+  baixo em cima dela rola a página (`touch-action: pan-y`); arrastar para os
+  lados gira; dois dedos dão zoom. No computador, a rodinha rola a página e o
+  zoom é Ctrl + rodinha (ou a pinça do trackpad) ou os botões − e +. O botão ↺
+  volta à vista inicial.
+- **O canvas do 3D tem `width/height: 100%`.** O desenho é feito em 2× nas
+  telas de alta densidade; sem esse CSS a maquete saía com o dobro do tamanho
+  e cortada (aconteceu no iPhone e num notebook com zoom de 125%).
+

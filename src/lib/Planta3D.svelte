@@ -3,6 +3,7 @@
   // repassa a lista a cada mudança: marcar um item como comprado deixa o
   // móvel sólido na hora.
   import { onMount } from 'svelte';
+  import { Plus, Minus, RotateCcw } from '@lucide/svelte';
   import type { AreaId } from '../../shared/planta';
   import { AREAS } from '../../shared/planta';
   import { totais } from '../../shared/resumo';
@@ -14,6 +15,13 @@
   let host: HTMLDivElement;
   let planta: Planta | null = null;
   let situacao = $state<'carregando' | 'pronta' | 'sem3d'>('carregando');
+  // Toque (celular) ou mouse: a explicação dos gestos muda.
+  const toque = matchMedia('(pointer: coarse)').matches;
+  const dica = $derived(
+    (toque ? 'Toque' : 'Clique') +
+      (modo === 'geral' ? ' num cômodo para entrar' : ' num móvel para abrir') +
+      (toque ? ' · arraste de lado para girar' : ' · arraste para girar · Ctrl + rodinha para zoom'),
+  );
 
   const infos = $derived<InfoArea[]>(
     AREAS.map((a) => {
@@ -82,10 +90,18 @@
       <span><i class="solido"></i> comprado</span>
       <span><i class="vazado"></i> falta comprar</span>
     </div>
-    <p class="como">
-      {modo === 'geral' ? 'Toque num cômodo para entrar · arraste para girar' : 'Toque num móvel para abrir · arraste para girar'}
-    </p>
   {/if}
+  <!-- Botões à esquerda: no celular, o botão + (novo item) fica no canto direito da tela. -->
+  <div class="barra3d">
+    {#if situacao === 'pronta'}
+      <div class="botoes3d">
+        <button onclick={() => planta?.aproximar(1.25)} aria-label="Afastar a maquete"><Minus size={18} /></button>
+        <button onclick={() => planta?.aproximar(0.8)} aria-label="Aproximar a maquete"><Plus size={18} /></button>
+        <button onclick={() => planta?.recentrar()} aria-label="Voltar para a vista inicial"><RotateCcw size={17} /></button>
+      </div>
+    {/if}
+    <p class="como">{situacao === 'pronta' ? dica : ''}</p>
+  </div>
 </div>
 
 <style>
@@ -98,7 +114,15 @@
     overflow: hidden;
     box-shadow: var(--sombra);
   }
-  .palco { position: relative; height: clamp(260px, 42vh, 420px); }
+  .palco {
+    position: relative;
+    height: clamp(260px, 42vh, 420px);
+    overflow: hidden;
+    /* Segurar o dedo na maquete não abre menu nem seleciona texto. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
   .geral .palco { height: clamp(300px, 52vh, 520px); }
   @media (max-width: 700px) { .geral .palco { height: clamp(380px, 62vh, 560px); } }
   .aviso3d {
@@ -128,16 +152,31 @@
   .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
   .legenda .solido { background: var(--dourado); }
   .legenda .vazado { background: rgb(27 45 85 / 0.16); border: 1.5px solid var(--dourado-barra); }
-  .como {
-    position: absolute;
-    bottom: var(--esp-2);
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: var(--fs-100);
-    color: var(--texto-3);
-    pointer-events: none;
+  /* Faixa embaixo da maquete: a explicação dos gestos e os botões de zoom.
+     Fica fora da área do 3D para nunca cobrir o desenho. */
+  .barra3d {
+    display: flex;
+    align-items: center;
+    gap: var(--esp-3);
+    min-height: 52px;
+    padding: var(--esp-1) var(--esp-4) var(--esp-1) var(--esp-2);
+    border-top: 1px solid var(--borda);
+    background: rgb(255 255 255 / 0.7);
   }
+  .como { font-size: var(--fs-100); color: var(--texto-3); line-height: 1.35; }
+  .botoes3d { display: flex; gap: var(--esp-1); flex: none; }
+  .botoes3d button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--borda);
+    border-radius: var(--r-1);
+    background: var(--superficie);
+    color: var(--marinho);
+  }
+  .botoes3d button:hover { background: var(--superficie-2); }
+  .botoes3d button:active { transform: scale(0.95); }
 
   /* Elementos criados pelo planta3d.ts. */
   .palco :global(.rotulos3d) { position: absolute; inset: 0; pointer-events: none; }
