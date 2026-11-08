@@ -49,9 +49,9 @@ describe('totais', () => {
 
 describe('porComodo', () => {
   const comodos: Comodo[] = [
-    { id: 1, nome: 'Cozinha', icone: 'panela', ordem: 1, ativo: 1 },
-    { id: 2, nome: 'Varanda', icone: 'flor', ordem: 2, ativo: 0 },
-    { id: 3, nome: 'Quarto', icone: 'cama', ordem: 3, ativo: 1 },
+    { id: 1, nome: 'Cozinha', icone: 'panela', ordem: 1, ativo: 1, area: null },
+    { id: 2, nome: 'Varanda', icone: 'flor', ordem: 2, ativo: 0, area: null },
+    { id: 3, nome: 'Quarto', icone: 'cama', ordem: 3, ativo: 1, area: null },
   ];
   it('só cômodos ativos, na ordem, inclusive os vazios', () => {
     const r = porComodo(comodos, [item({ comodo_id: 1 }), comprado({ comodo_id: 1 }), item({ comodo_id: 2 })]);
@@ -124,5 +124,63 @@ describe('sugestões', () => {
       expect(sugestoesPara(c, []).length, c).toBeGreaterThan(0);
     }
     expect(sugestoesPara('Garagem', [])).toEqual([]);
+  });
+});
+
+import { AREAS, area, pecaDoItem, distribuir, situacao, PAREDES, LARGURA, FUNDO } from '../shared/planta';
+
+describe('planta', () => {
+  const peca = (a: string, nome: string) => pecaDoItem(area(a)!, nome)?.id;
+
+  it('cada item vai para o móvel certo', () => {
+    expect(peca('cozinha', 'Geladeira Brastemp Frost Free')).toBe('geladeira');
+    expect(peca('cozinha', 'Fogão 4 bocas')).toBe('fogao');
+    expect(peca('cozinha', 'Micro-ondas')).toBe('microondas');
+    expect(peca('servico', 'Máquina de lavar 12kg')).toBe('lavadora');
+    expect(peca('sala', 'Mesa de centro')).toBe('mesa_centro');
+    expect(peca('sala', 'Mesa de jantar 4 lugares')).toBe('mesa');
+    expect(peca('sala', 'Cadeiras')).toBe('cadeiras');
+    expect(peca('sala', 'Sofá retrátil')).toBe('sofa');
+    expect(peca('sala', 'Smart TV 50"')).toBe('tv');
+    expect(peca('sala', 'Rack ou painel')).toBe('rack');
+    expect(peca('quarto1', 'Cama box casal')).toBe('cama');
+    expect(peca('quarto1', 'Colchão')).toBe('cama');
+    expect(peca('quarto1', 'Mesas de cabeceira')).toBe('criados');
+    expect(peca('quarto2', 'Luminária de mesa')).toBe('luminaria');
+    expect(peca('quarto2', 'Mesa de trabalho')).toBe('escrivaninha');
+    expect(peca('quarto2', 'Cama ou sofá-cama')).toBe('cama');
+  });
+
+  it('coisas pequenas e tecidos não viram móvel', () => {
+    expect(peca('cozinha', 'Talheres')).toBeUndefined();
+    expect(peca('cozinha', 'Pratos rasos')).toBeUndefined();
+    expect(peca('quarto1', 'Jogo de cama')).toBeUndefined();
+    expect(peca('quarto1', 'Travesseiros')).toBeUndefined();
+    expect(peca('quarto2', 'Jogo de cama de visita')).toBeUndefined();
+    expect(peca('sala', 'Almofadas')).toBeUndefined();
+    expect(peca('sala', 'Camarão')).toBeUndefined();
+  });
+
+  it('distribui e diz a situação de cada peça', () => {
+    const cama = item({ nome: 'Cama', comprado: 1, comprado_em: 'x' });
+    const colchao = item({ nome: 'Colchão' });
+    const lencol = item({ nome: 'Jogo de lençol' });
+    const d = distribuir(area('quarto1')!, [cama, colchao, lencol]);
+    expect(d.pecas.get('cama')?.length).toBe(2);
+    expect(d.pequenos).toEqual([lencol]);
+    expect(situacao(d.pecas.get('cama'))).toBe('falta');
+    expect(situacao([cama])).toBe('comprado');
+    expect(situacao(undefined)).toBe('vazio');
+  });
+
+  it('tudo cabe dentro do apartamento', () => {
+    const dentro = (r: { x: number; z: number; w: number; d: number }) =>
+      r.x >= 0 && r.z >= 0 && r.x + r.w <= LARGURA + 1e-9 && r.z + r.d <= FUNDO + 1e-9;
+    for (const a of AREAS) {
+      expect(dentro(a.ret), a.id).toBe(true);
+      for (const p of a.pecas) expect(dentro(p.ret), `${a.id}/${p.id}`).toBe(true);
+      expect(dentro(a.apoio), `${a.id}/apoio`).toBe(true);
+    }
+    for (const [x1, z1, x2, z2] of PAREDES) expect(x1 === x2 || z1 === z2).toBe(true);
   });
 });

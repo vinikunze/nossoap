@@ -16,6 +16,8 @@ export interface Comodo {
   icone: string;
   ordem: number;
   ativo: number;
+  /** Cômodo da planta 3D (ver shared/planta.ts). null = sem maquete. */
+  area: string | null;
 }
 
 export interface Item {

@@ -5,11 +5,13 @@
   import { estado } from '../lib/estado.svelte';
   import { api } from '../lib/api';
   import Icone, { NOMES_ICONES } from '../lib/Icone.svelte';
+  import { AREAS } from '../../shared/planta';
 
   // id do cômodo aberto para editar; 0 = criando um novo.
   let aberto = $state<number | null>(null);
   let nome = $state('');
   let icone = $state<string>('casa');
+  let area = $state<string>('');
   let salvando = $state(false);
   let erro = $state('');
 
@@ -21,6 +23,7 @@
     aberto = c?.id ?? 0;
     nome = c?.nome ?? '';
     icone = c?.icone ?? 'casa';
+    area = c?.area ?? '';
     erro = '';
   }
 
@@ -30,7 +33,8 @@
     salvando = true;
     erro = '';
     try {
-      const c = aberto ? await api.editarComodo(aberto, { nome: nome.trim(), icone }) : await api.criarComodo(nome.trim(), icone);
+      let c = aberto ? await api.editarComodo(aberto, { nome: nome.trim(), icone }) : await api.criarComodo(nome.trim(), icone);
+      if ((c.area ?? '') !== area) c = await api.editarComodo(c.id, { area: area || null });
       estado.guardarComodo(c);
       aberto = null;
     } catch (e) {
@@ -95,6 +99,16 @@
         {/each}
       </div>
     </fieldset>
+    <label class="campo">
+      <span>Na planta 3D</span>
+      <select class="entrada" bind:value={area}>
+        <option value="">Sem maquete</option>
+        {#each AREAS as a (a.id)}
+          {@const dono = estado.comodos.find((x) => x.area === a.id && x.id !== c?.id)}
+          <option value={a.id} disabled={!!dono}>{a.nome}{dono ? ` (já é ${dono.nome})` : ''}</option>
+        {/each}
+      </select>
+    </label>
     {#if erro}<p class="erro" role="alert">{erro}</p>{/if}
     <div class="botoes">
       <button class="botao" type="submit" disabled={salvando}>{salvando ? 'Salvando…' : c ? 'Salvar' : 'Criar cômodo'}</button>

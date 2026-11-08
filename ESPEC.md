@@ -18,11 +18,11 @@ apartamento**, organizado por cômodo, com quanto vai custar e quanto já foi.
 
 ## Organização: por cômodo
 
-Cada item mora em **um cômodo**. Cômodos prontos, editáveis (renomear, criar,
-reordenar, arquivar):
+Cada item mora em **um cômodo**. Cômodos prontos (lista do Vini, 08/11/2026),
+editáveis (renomear, criar, reordenar, arquivar):
 
-Cozinha · Sala · Quarto · Banheiro · Lavanderia · Escritório · Área externa ·
-Geral (o que não é de um cômodo só: ferramentas, produtos de limpeza…)
+Cozinha · Lavanderia · Sala de estar · Quarto · Banheiro ·
+Quarto de visita / Escritório
 
 Cada cômodo mostra uma **barra de progresso**: itens comprados ÷ itens da lista.
 
@@ -63,12 +63,35 @@ computador, igual ao app de finanças.
 
 ## Visual
 
-Proposta: mesma família visual do app de finanças ("nós.", preto e dourado),
-para os dois apps parecerem irmãos. Ver "Pendências".
+**Branco, dourado e azul-marinho** (Vini, 08/11/2026). Tema claro único.
 
-- Ícone de linha para cada cômodo.
-- Valores sempre com centavos.
-- Tema escuro único, como no app de finanças.
+- Marinho é a cor de ação (botões, item ativo) e do destaque da tela inicial.
+- Dourado é a marca: barras de progresso, ícones dos cômodos, o ponto do logo.
+- O dourado claro não tem contraste para texto no branco; texto dourado usa um
+  tom mais escuro. Todos os textos passam de 4,5:1.
+- Ícone de linha para cada cômodo. Valores sempre com centavos.
+
+## Maquete 3D (pedido do Vini, 08/11/2026)
+
+A planta do apartamento (Apartamento Padrão, 48,29 m², pé-direito 2,80 m) foi
+redesenhada em metros em `shared/planta.ts`.
+
+- **Início**: o apartamento inteiro em 3D, cortado a 1,1 m de altura como uma
+  planta de arquiteto, com o nome e o % de cada cômodo. Tocar num cômodo entra
+  nele. No celular a vista gira 90° para a planta ocupar a tela em pé.
+- **Cômodo**: só ele, com paredes inteiras; as que ficam na frente da câmera
+  ficam transparentes. A câmera escolhe sozinha o ângulo em que o cômodo
+  aparece maior. Arrastar gira.
+- **Os itens da lista aparecem na maquete**: o nome do item decide o lugar
+  ("Geladeira Brastemp" vai para o lugar da geladeira). Comprado = sólido, com
+  cor; falta comprar = fantasma azul com contorno dourado. Item que não é móvel
+  (talheres, pratos, toalhas) vira um pacotinho no apoio do cômodo (na
+  cozinha, sobre a bancada). Tocar num móvel abre o item.
+- Pia, vaso, box, tanque e bancadas vêm com o apartamento: aparecem sempre.
+- Cada cômodo da lista é ligado a um lugar da planta (Ajustes → editar cômodo
+  → "Na planta 3D"). Cômodo criado por vocês pode ficar sem maquete.
+- O Three.js só é baixado quando a maquete aparece (145 KB comprimido); a
+  lista sozinha tem 40 KB.
 
 ## Conta e instalação
 
@@ -106,14 +129,17 @@ no app de finanças.
 
 ## Ordem de entrega
 
-1. **Primeiro**: banco, API, Lista, cadastrar/editar/marcar comprado, Início.
-2. Depois: filtros, busca, Ajustes de cômodos, ícone instalável.
+1. Feito em 08/11/2026: banco, API, Lista, cadastrar/editar/marcar comprado,
+   Início, filtros, busca, sugestões por cômodo, Ajustes de cômodos, ícone
+   instalável e maquete 3D.
+2. Falta: publicar (passos do Vini no painel da Cloudflare, ver Pendências).
 
 ## Fora do escopo (por enquanto)
 
 - Integração com o app de finanças (lançar o gasto lá ao marcar comprado).
   Os apps ficam separados; dá para ligar depois.
 - Foto do produto (precisaria do R2, que tem 10 GB grátis).
+- Arrastar móveis na maquete para mudar de lugar (o lugar de cada móvel é fixo).
 - Comparar várias lojas para o mesmo item.
 - Marcar presentes recebidos (chá de casa nova).
 - Inspirações / itens "em dúvida".
@@ -121,11 +147,13 @@ no app de finanças.
 
 ## Pendências
 
-- **Visual**: repetir o preto e dourado do app de finanças ou ter cor própria?
-- **Nome**: "nosso ap." serve?
-- **Vini, na Cloudflare** (o Zero Trust já deve estar ativo por causa do app
-  de finanças):
-  1. Ligar este repositório a um Worker novo (Workers Builds).
-  2. Criar uma aplicação no Access para o endereço novo, com os dois e-mails.
-- **Cômodos**: a lista acima bate com o apartamento de vocês? (tem
-  escritório? varanda?)
+- **Vini, na Cloudflare** (o banco D1 `nosso-ap` já foi criado e preparado):
+  1. Workers & Pages → Create → Import a repository → `vinikunze/nossoap`.
+     Build: `npm run build`. Deploy: `npx wrangler deploy`. Raiz: `/`.
+     Branch de produção: a que tiver este código.
+  2. Zero Trust → Access → Applications → Add → Self-hosted: domínio
+     `nosso-ap.vinihkunze.workers.dev`, política "Allow" com os dois e-mails,
+     login por código no e-mail (One-time PIN).
+  3. Abrir o endereço no celular e "Adicionar à tela de início".
+- Sem o passo 2 o site abre, mas a API recusa tudo (não há login), então
+  nenhum dado fica exposto.

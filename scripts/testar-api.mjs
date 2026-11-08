@@ -92,6 +92,12 @@ const ord = await pedir('POST', 'comodos/ordem', { ids });
 const depois = await pedir('GET', 'dados');
 conferir('reordena cômodos', ord.status === 200 && depois.dados.comodos[0].id === varanda.dados.id, depois.dados.comodos.map((c) => c.nome));
 await pedir('POST', 'comodos/ordem', { ids: inicial.comodos.map((c) => c.id).concat(varanda.dados.id) });
+const areaRepetida = await pedir('PATCH', `comodos/${varanda.dados.id}`, { area: 'cozinha' });
+conferir('lugar da planta já usado (409)', areaRepetida.status === 409, areaRepetida);
+const areaRuim = await pedir('PATCH', `comodos/${varanda.dados.id}`, { area: 'garagem' });
+conferir('lugar da planta inventado (400)', areaRuim.status === 400, areaRuim);
+const semArea = await pedir('PATCH', `comodos/${varanda.dados.id}`, { area: null });
+conferir('cômodo sem maquete', semArea.status === 200 && semArea.dados.area === null, semArea);
 const apagarVazio = await pedir('DELETE', `comodos/${varanda.dados.id}`);
 conferir('apaga cômodo vazio', apagarVazio.status === 200, apagarVazio);
 

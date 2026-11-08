@@ -5,6 +5,7 @@
   import Valor from '../lib/Valor.svelte';
   import Icone from '../lib/Icone.svelte';
   import LinhaItem from '../lib/LinhaItem.svelte';
+  import Planta3D from '../lib/Planta3D.svelte';
 
   const MAX_ESSENCIAIS = 6;
 
@@ -12,6 +13,8 @@
   const comodos = $derived(porComodo(estado.comodos, estado.itens));
   const essenciais = $derived(ordenar(estado.itens.filter((i) => !i.comprado && i.prioridade === 'essencial')));
 </script>
+
+<Planta3D modo="geral" />
 
 <section class="heroi">
   <p class="rotulo">Falta gastar</p>
@@ -71,6 +74,7 @@
 
 <style>
   .heroi {
+    margin-top: var(--esp-4);
     display: grid;
     gap: var(--esp-2);
     padding: var(--esp-5);

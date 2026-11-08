@@ -12,6 +12,8 @@
   import LinhaItem from '../lib/LinhaItem.svelte';
   import Icone from '../lib/Icone.svelte';
   import Valor from '../lib/Valor.svelte';
+  import Planta3D from '../lib/Planta3D.svelte';
+  import { area as areaDaPlanta } from '../../shared/planta';
 
   let { comodo }: { comodo?: Comodo } = $props();
 
@@ -67,6 +69,10 @@
     }
   }
 </script>
+
+{#if comodo && areaDaPlanta(comodo.area)}
+  <div class="maquete"><Planta3D modo={areaDaPlanta(comodo.area)!.id} /></div>
+{/if}
 
 {#if comodo}
   <section class="cartao topo-comodo">
@@ -153,6 +159,7 @@
 {/if}
 
 <style>
+  .maquete { margin-bottom: var(--esp-4); }
   .topo-comodo { display: grid; gap: var(--esp-3); margin-bottom: var(--esp-4); }
   .linha { display: flex; align-items: center; gap: var(--esp-3); }
   .info { flex: 1; display: grid; gap: 2px; }

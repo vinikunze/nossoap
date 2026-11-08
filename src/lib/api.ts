@@ -50,7 +50,7 @@ export const api = {
   comprar: (id: number, pago_centavos: number | null) => pedir<Item>('POST', `itens/${id}/comprar`, { pago_centavos }),
   desfazer: (id: number) => pedir<Item>('POST', `itens/${id}/desfazer`),
   criarComodo: (nome: string, icone: string) => pedir<Comodo>('POST', 'comodos', { nome, icone }),
-  editarComodo: (id: number, c: Partial<Pick<Comodo, 'nome' | 'icone' | 'ativo'>>) => pedir<Comodo>('PATCH', `comodos/${id}`, c),
+  editarComodo: (id: number, c: Partial<Pick<Comodo, 'nome' | 'icone' | 'ativo' | 'area'>>) => pedir<Comodo>('PATCH', `comodos/${id}`, c),
   ordenarComodos: (ids: number[]) => pedir('POST', 'comodos/ordem', { ids }),
   apagarComodo: (id: number) => pedir('DELETE', `comodos/${id}`),
 };

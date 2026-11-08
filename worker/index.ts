@@ -3,6 +3,7 @@
 // erro de configuração no Access não abra a lista para ninguém.
 
 import { linkValido } from '../shared/texto';
+import { AREAS } from '../shared/planta';
 import type { Prioridade } from '../shared/tipos';
 
 interface Env {
@@ -197,12 +198,13 @@ async function desfazerCompra(env: Env, itemId: number): Promise<Response> {
 
 // ---------- cômodos ----------
 
-const CAMPOS_COMODO = 'id, nome, icone, ordem, ativo';
+const CAMPOS_COMODO = 'id, nome, icone, ordem, ativo, area';
 
 async function erroDeNomeRepetido<T>(f: () => Promise<T>): Promise<T> {
   try {
     return await f();
   } catch (e) {
+    if (String(e).includes('comodos.area')) throw new Erro(409, 'Outro cômodo já usa esse lugar da planta.');
     if (String(e).includes('UNIQUE')) throw new Erro(409, 'Já existe um cômodo com esse nome.');
     throw e;
   }
@@ -224,7 +226,7 @@ async function criarComodo(env: Env, req: Request): Promise<Response> {
 async function editarComodo(env: Env, req: Request, comodoId: number): Promise<Response> {
   const b = await corpo(req);
   const atual = await env.DB.prepare(`SELECT ${CAMPOS_COMODO} FROM comodos WHERE id = ?`).bind(comodoId)
-    .first<{ nome: string; icone: string; ativo: number }>();
+    .first<{ nome: string; icone: string; ativo: number; area: string | null }>();
   if (!atual) throw new Erro(404, 'Cômodo não encontrado.');
   const nome = b.nome === undefined ? atual.nome : texto(b.nome, 'o nome', 40);
   const ic = b.icone === undefined ? atual.icone : icone(b.icone);
@@ -233,9 +235,14 @@ async function editarComodo(env: Env, req: Request, comodoId: number): Promise<R
     if (b.ativo !== 0 && b.ativo !== 1) throw new Erro(400, 'Valor inválido.');
     ativo = b.ativo;
   }
+  let area = atual.area;
+  if (b.area !== undefined) {
+    if (b.area !== null && !AREAS.some((a) => a.id === b.area)) throw new Erro(400, 'Lugar da planta inválido.');
+    area = b.area as string | null;
+  }
   const c = await erroDeNomeRepetido(() =>
-    env.DB.prepare(`UPDATE comodos SET nome = ?, icone = ?, ativo = ? WHERE id = ? RETURNING ${CAMPOS_COMODO}`)
-      .bind(nome, ic, ativo, comodoId).first(),
+    env.DB.prepare(`UPDATE comodos SET nome = ?, icone = ?, ativo = ?, area = ? WHERE id = ? RETURNING ${CAMPOS_COMODO}`)
+      .bind(nome, ic, ativo, area, comodoId).first(),
   );
   return json(c);
 }

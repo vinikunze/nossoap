@@ -10,7 +10,9 @@ CREATE TABLE comodos (
   -- depender da biblioteca de ícones.
   icone TEXT NOT NULL,
   ordem INTEGER NOT NULL DEFAULT 0,
-  ativo INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1))
+  ativo INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1)),
+  -- Cômodo da planta 3D (shared/planta.ts). NULL = cômodo sem maquete.
+  area TEXT UNIQUE CHECK (area IS NULL OR area IN ('cozinha', 'servico', 'sala', 'bwc', 'quarto1', 'quarto2'))
 );
 
 CREATE TABLE itens (
@@ -40,10 +42,10 @@ CREATE TABLE itens (
 
 CREATE INDEX itens_comodo ON itens (comodo_id, comprado);
 
-INSERT INTO comodos (nome, icone, ordem) VALUES
-  ('Cozinha', 'panela', 1),
-  ('Lavanderia', 'lavadora', 2),
-  ('Sala de estar', 'sofa', 3),
-  ('Quarto', 'cama', 4),
-  ('Banheiro', 'banheira', 5),
-  ('Quarto de visita / Escritório', 'notebook', 6);
+INSERT INTO comodos (nome, icone, ordem, area) VALUES
+  ('Cozinha', 'panela', 1, 'cozinha'),
+  ('Lavanderia', 'lavadora', 2, 'servico'),
+  ('Sala de estar', 'sofa', 3, 'sala'),
+  ('Quarto', 'cama', 4, 'quarto1'),
+  ('Banheiro', 'banheira', 5, 'bwc'),
+  ('Quarto de visita / Escritório', 'notebook', 6, 'quarto2');
