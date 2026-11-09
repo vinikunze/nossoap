@@ -3,23 +3,37 @@
   // repassa a lista a cada mudança: marcar um item como comprado deixa o
   // móvel sólido na hora.
   import { onMount } from 'svelte';
-  import { Plus, Minus, RotateCcw } from '@lucide/svelte';
+  import { Plus, Minus, RotateCcw, X, Check } from '@lucide/svelte';
   import type { AreaId } from '../../shared/planta';
   import { AREAS } from '../../shared/planta';
   import { totais } from '../../shared/resumo';
   import { estado } from './estado.svelte';
-  import type { InfoArea, Planta } from './planta3d';
+  import type { InfoArea, ModuloAberto, Planta } from './planta3d';
+  import { nomeDaPrioridade } from '../../shared/tipos';
 
   let { modo }: { modo: 'geral' | AreaId } = $props();
 
   let host: HTMLDivElement;
   let planta: Planta | null = null;
   let situacao = $state<'carregando' | 'pronta' | 'sem3d'>('carregando');
+  // Armário ou gaveta aberto na maquete: a lista do que vai dentro aparece embaixo.
+  let moduloAberto = $state<ModuloAberto | null>(null);
+  const comprados = $derived(moduloAberto ? moduloAberto.itens.filter((i) => i.comprado).length : 0);
+
+  function abrirItem(id: number) {
+    const atual = estado.itens.find((i) => i.id === id);
+    if (atual) estado.gaveta = { tipo: 'editar', item: atual };
+  }
+
+  function novoAqui() {
+    const c = moduloAberto && estado.comodos.find((x) => x.area === moduloAberto!.area && x.ativo);
+    estado.gaveta = { tipo: 'novo', comodo_id: c?.id };
+  }
   // Toque (celular) ou mouse: a explicação dos gestos muda.
   const toque = matchMedia('(pointer: coarse)').matches;
   const dica = $derived(
     (toque ? 'Toque' : 'Clique') +
-      (modo === 'geral' ? ' num cômodo para entrar' : ' num móvel para abrir') +
+      (modo === 'geral' ? ' num cômodo para entrar' : ' num armário, gaveta ou móvel para abrir') +
       (toque ? ' · arraste de lado para girar' : ' · arraste para girar · Ctrl + rodinha para zoom'),
   );
 
@@ -56,10 +70,8 @@
             const c = estado.comodos.find((x) => x.area === id && x.ativo);
             if (c) location.hash = `comodo/${c.id}`;
           },
-          aoEscolherItem: (item) => {
-            const atual = estado.itens.find((i) => i.id === item.id);
-            if (atual) estado.gaveta = { tipo: 'editar', item: atual };
-          },
+          aoEscolherItem: (item) => abrirItem(item.id),
+          aoAbrirModulo: (m) => (moduloAberto = m),
         });
         situacao = 'pronta';
       })
@@ -89,6 +101,7 @@
     <div class="legenda" aria-hidden="true">
       <span><i class="solido"></i> comprado</span>
       <span><i class="vazado"></i> falta comprar</span>
+      <span><i class="argila"></i> decoração</span>
     </div>
   {/if}
   <!-- Botões à esquerda: no celular, o botão + (novo item) fica no canto direito da tela. -->
@@ -102,6 +115,35 @@
     {/if}
     <p class="como">{situacao === 'pronta' ? dica : ''}</p>
   </div>
+  {#if moduloAberto}
+    <section class="dentro" aria-live="polite">
+      <header>
+        <div>
+          <h3>{moduloAberto.nome}</h3>
+          <p class="num">
+            {moduloAberto.itens.length === 0
+              ? 'Vazio por enquanto'
+              : `${moduloAberto.itens.length} ${moduloAberto.itens.length === 1 ? 'item' : 'itens'} · ${comprados} ${comprados === 1 ? 'comprado' : 'comprados'}`}
+          </p>
+        </div>
+        <button class="fechar" onclick={() => planta?.fecharModulo()} aria-label="Fechar {moduloAberto.nome}"><X size={18} /></button>
+      </header>
+      {#if moduloAberto.itens.length}
+        <ul>
+          {#each moduloAberto.itens as item (item.id)}
+            <li>
+              <button onclick={() => abrirItem(item.id)}>
+                <span class="marca" class:ok={item.comprado}>{#if item.comprado}<Check size={14} strokeWidth={3} />{/if}</span>
+                <span class="nome-item">{#if item.quantidade > 1}<b class="num">{item.quantidade}×&nbsp;</b>{/if}{item.nome}</span>
+                <span class="estado">{item.comprado ? 'comprado' : nomeDaPrioridade(item.prioridade)}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <button class="link" onclick={novoAqui}>+ Adicionar item neste cômodo</button>
+    </section>
+  {/if}
 </div>
 
 <style>
@@ -152,6 +194,23 @@
   .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
   .legenda .solido { background: var(--dourado); }
   .legenda .vazado { background: rgb(27 45 85 / 0.16); border: 1.5px solid var(--dourado-barra); }
+  .legenda .argila { background: #e6e1d6; border: 1px solid #c9c3b6; }
+
+  /* O que tem dentro do armário ou gaveta aberto. */
+  .dentro { border-top: 1px solid var(--borda); background: var(--superficie); padding: var(--esp-3) var(--esp-4) var(--esp-4); display: grid; gap: var(--esp-2); }
+  .dentro header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--esp-3); }
+  .dentro h3 { font-size: var(--fs-400); font-weight: var(--fw-semi); }
+  .dentro header p { font-size: var(--fs-200); color: var(--texto-3); }
+  .dentro .fechar { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--superficie-2); color: var(--texto-2); flex: none; }
+  .dentro ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .dentro li + li { border-top: 1px solid var(--borda); }
+  .dentro li button { display: flex; align-items: center; gap: var(--esp-3); width: 100%; min-height: 44px; border: 0; background: none; text-align: left; padding: var(--esp-1) 0; }
+  .marca { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--texto-3); color: #fff; }
+  .marca.ok { background: var(--verde); border-color: var(--verde); }
+  .nome-item { flex: 1; font-size: var(--fs-300); }
+  .nome-item b { color: var(--dourado-texto); }
+  .estado { font-size: var(--fs-100); color: var(--texto-3); white-space: nowrap; }
+  .dentro .link { justify-self: start; }
   /* Faixa embaixo da maquete: a explicação dos gestos e os botões de zoom.
      Fica fora da área do 3D para nunca cobrir o desenho. */
   .barra3d {

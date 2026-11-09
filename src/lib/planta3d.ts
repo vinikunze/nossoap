@@ -16,8 +16,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  AREAS, PAREDES, PORTAS, JANELAS, CIRCULACAO, LARGURA, FUNDO, distribuir, situacao,
-  type Area, type AreaId, type Peca, type Ret, type Frente, type Porta,
+  AREAS, PAREDES, PORTAS, JANELAS, CIRCULACAO, LARGURA, FUNDO, distribuir, situacao, miniaturaDo,
+  type Area, type AreaId, type Peca, type Ret, type Frente, type Porta, type Modulo, type Miniatura,
 } from '../../shared/planta';
 import type { Item } from '../../shared/tipos';
 
@@ -36,6 +36,15 @@ export interface Opcoes {
   areas: InfoArea[];
   aoEscolherArea?: (id: AreaId) => void;
   aoEscolherItem?: (item: Item) => void;
+  /** Um armário ou gaveta abriu (com o que tem dentro) ou fechou (null). */
+  aoAbrirModulo?: (m: ModuloAberto | null) => void;
+}
+
+export interface ModuloAberto {
+  id: string;
+  area: AreaId;
+  nome: string;
+  itens: Item[];
 }
 
 export interface Planta {
@@ -44,6 +53,8 @@ export interface Planta {
   aproximar(fator: number): void;
   /** Volta para a vista inicial. */
   recentrar(): void;
+  /** Fecha o armário ou gaveta aberto. */
+  fecharModulo(): void;
   destruir(): void;
 }
 
@@ -141,6 +152,12 @@ function criarMats(): Mats {
     vidro: material(COR.vidro, { transparent: true, opacity: 0.28, roughness: 0.1, depthWrite: false }),
     luz: material(COR.creme, { emissive: 0xffe2a8, emissiveIntensity: 0.35 }),
     friso: material(0xb5b0a5),
+    // Móvel fora da lista: decoração, na cor de maquete branca.
+    argila: material(0xe6e1d6, { roughness: 1 }),
+    interno: material(0xf4f1ea),
+    frente: material(0xc9a77c, { roughness: 0.7 }),
+    granito: material(0x3d414b, { roughness: 0.35 }),
+    vidroCopo: material(0xcfe3ec, { roughness: 0.2 }),
   };
 }
 
@@ -299,12 +316,42 @@ const MODELOS: Record<Peca['modelo'], Construtor> = {
     caixa(g, w * 0.9, 0.07, d * 0.85, m.marinho, 0, 0.43);
     caixa(g, w * 0.85, h - 0.5, 0.06, m.marinho, 0, 0.5, -d / 2 + 0.06);
   },
-  pia_banheiro(g, w, d, h, _p, m) {
-    caixa(g, w, h - 0.03, d, m.madeira);
-    caixa(g, w + 0.02, 0.03, d + 0.02, m.branco, 0, h - 0.03);
-    cilindro(g, 0.16, 0.1, m.branco, 0, h, 0.02, 0.18);
-    cilindro(g, 0.012, 0.2, m.inox, 0, h, -d / 2 + 0.06);
-    frisos(g, w, h - 0.1, d, 2, 1, m.madeiraEscura, 0.05);
+  // Só o tampo, a cuba e a torneira: o gabinete embaixo é um módulo que abre.
+  pia_banheiro(g, w, d, _h, _p, m) {
+    caixa(g, w + 0.02, 0.03, d + 0.02, m.branco);
+    cilindro(g, 0.16, 0.09, m.branco, 0, 0.03, 0.02, 0.18);
+    cilindro(g, 0.012, 0.2, m.inox, 0, 0.03, -d / 2 + 0.06);
+  },
+  forno(g, w, d, h, _p, m) {
+    caixa(g, w, h, d, m.preto);
+    caixa(g, w * 0.86, h * 0.62, 0.006, m.vidroEscuro, 0, h * 0.12, d / 2 + 0.003);
+    caixa(g, w * 0.7, 0.02, 0.03, m.inox, 0, h * 0.82, d / 2 + 0.015);
+  },
+  cooktop(g, w, d, _h, _p, m) {
+    caixa(g, w, 0.012, d, m.preto);
+    for (const [x, z, r] of [[-1, -1, 0.09], [1, -1, 0.07], [-1, 1, 0.07], [1, 1, 0.09]]) {
+      cilindro(g, r, 0.003, m.vidroEscuro, (x * w) / 4, 0.012, (z * d) / 4, r * 0.96);
+    }
+  },
+  tampo(g, w, d, h, _p, m) {
+    caixa(g, w, h, d, m.granito);
+  },
+  cuba(g, w, d, _h, _p, m) {
+    caixa(g, w, 0.004, d, m.inox);
+    caixa(g, w * 0.9, 0.006, d * 0.85, m.preto, 0, 0.001, 0);
+    cilindro(g, 0.016, 0.3, m.inox, 0, 0, -d / 2 - 0.04);
+    caixa(g, 0.025, 0.025, 0.2, m.inox, 0, 0.28, -d / 2 + 0.05);
+  },
+  nicho(g, w, d, h, _p, m) {
+    const t = 0.018;
+    caixa(g, t, h, d, m.interno, -w / 2 + t / 2);
+    caixa(g, t, h, d, m.interno, w / 2 - t / 2);
+    caixa(g, w, t, d, m.interno, 0, h - t);
+    caixa(g, w, h, t, m.interno, 0, 0, -d / 2 + t / 2);
+    caixa(g, w - 2 * t, t, d, m.interno, 0, 0.6);
+  },
+  rodape(g, w, d, h, _p, m) {
+    caixa(g, w, h, d, m.preto);
   },
   vaso(g, w, d, _h, _p, m) {
     const base = cilindro(g, w * 0.4, 0.4, m.branco, 0, 0, 0.06, w * 0.45);
@@ -360,7 +407,98 @@ function construirPeca(p: Peca, m: Mats): THREE.Group {
   return g;
 }
 
+// ---------- miniaturas (o que fica dentro dos armários e gavetas) ----------
+
+/**
+ * Desenha a miniatura de um item numa célula de lado c, com a base em y = 0.
+ * Se ficar mais alta que hMax (a altura livre da prateleira), encolhe.
+ */
+function miniatura(tipo: Miniatura, c: number, hMax: number, m: Mats, nome: string): THREE.Group {
+  const g = new THREE.Group();
+  const escuro = /pret|black/i.test(nome);
+  switch (tipo) {
+    case 'prato':
+      for (let k = 0; k < 3; k++) cilindro(g, c * 0.42, c * 0.05, m.branco, 0, k * c * 0.055);
+      break;
+    case 'tigela':
+      cilindro(g, c * 0.22, c * 0.28, m.branco, 0, 0, 0, c * 0.42);
+      break;
+    case 'copo':
+      for (const [x, z] of [[-0.24, -0.15], [0.24, -0.15], [0, 0.2]]) cilindro(g, c * 0.12, c * 0.5, m.vidroCopo, x * c, 0, z * c, c * 0.14);
+      break;
+    case 'xicara':
+      for (const x of [-0.22, 0.22]) {
+        cilindro(g, c * 0.15, c * 0.24, m.branco, x * c, 0, 0);
+        caixa(g, c * 0.05, c * 0.12, c * 0.05, m.branco, x * c + c * 0.18, c * 0.06, 0);
+      }
+      break;
+    case 'talher':
+      for (const x of [-0.22, 0, 0.22]) caixa(g, c * 0.06, c * 0.03, c * 0.85, m.inox, x * c);
+      break;
+    case 'utensilio':
+      caixa(g, c * 0.08, c * 0.04, c * 0.62, m.preto, 0, 0, -c * 0.1);
+      cilindro(g, c * 0.16, c * 0.04, m.inox, 0, 0, c * 0.3);
+      break;
+    case 'pano':
+      caixa(g, c * 0.75, c * 0.1, c * 0.6, m.marinho);
+      caixa(g, c * 0.76, c * 0.102, c * 0.08, m.dourado, 0, 0, c * 0.15);
+      break;
+    case 'panela':
+      cilindro(g, c * 0.38, c * 0.38, m.inox);
+      caixa(g, c * 0.3, c * 0.04, c * 0.06, m.preto, c * 0.52, c * 0.3);
+      break;
+    case 'forma':
+      caixa(g, c * 0.85, c * 0.08, c * 0.65, m.inox);
+      caixa(g, c * 0.7, c * 0.005, c * 0.5, m.preto, 0, c * 0.08);
+      break;
+    case 'pote':
+      caixa(g, c * 0.55, c * 0.45, c * 0.55, m.creme);
+      caixa(g, c * 0.58, c * 0.06, c * 0.58, m.marinho, 0, c * 0.45);
+      break;
+    case 'eletro':
+      caixa(g, c * 0.6, c * 0.8, c * 0.55, m.preto);
+      caixa(g, c * 0.5, c * 0.05, c * 0.45, m.inox, 0, c * 0.8);
+      break;
+    case 'garrafa':
+      cilindro(g, c * 0.15, c * 0.9, m.inox);
+      cilindro(g, c * 0.1, c * 0.1, m.preto, 0, c * 0.9);
+      break;
+    case 'cabo': {
+      const alto = Math.min(hMax * 0.92, 1.3);
+      cilindro(g, 0.012, alto, m.madeira, 0, 0.05);
+      caixa(g, c * 0.55, 0.05, 0.07, m.preto);
+      break;
+    }
+    case 'balde':
+      cilindro(g, c * 0.28, c * 0.45, m.marinho, 0, 0, 0, c * 0.36);
+      break;
+    case 'produto':
+      cilindro(g, c * 0.14, c * 0.5, m.branco);
+      cilindro(g, c * 0.07, c * 0.08, m.dourado, 0, c * 0.5);
+      break;
+    case 'textil':
+      for (let k = 0; k < 3; k++) caixa(g, c * 0.8, c * 0.08, c * 0.6, escuro ? m.preto : k % 2 ? m.creme : m.branco, 0, k * c * 0.085);
+      break;
+    case 'travesseiro':
+      caixa(g, c * 0.85, c * 0.22, c * 0.5, m.branco);
+      break;
+    default:
+      caixa(g, c * 0.62, c * 0.5, c * 0.62, m.dourado);
+      caixa(g, c * 0.63, c * 0.08, c * 0.63, m.creme, 0, c * 0.2);
+  }
+  const altura = new THREE.Box3().setFromObject(g).max.y;
+  if (altura > hMax && altura > 0) g.scale.y = hMax / altura;
+  return g;
+}
+
 // ---------- fantasma (o que falta comprar) ----------
+
+/** Móvel fora da lista: tudo na cor de maquete branca. */
+function virarArgila(g: THREE.Object3D, argila: THREE.Material) {
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.material = argila;
+  });
+}
 
 function virarFantasma(g: THREE.Object3D, fantasma: THREE.Material, contorno: THREE.LineBasicMaterial) {
   const meshes: THREE.Mesh[] = [];
@@ -614,25 +752,204 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     mundo.add(lista);
     tocaveis.length = 0;
     deParede.length = 0;
+    estados.clear();
     for (const a of areasVisiveis) {
       const info = infos.find((i) => i.id === a.id);
       if (!info) continue;
-      const { pecas, pequenos } = distribuir(a, info.itens);
+      const { pecas, modulos, pequenos } = distribuir(a, info.itens);
       for (const p of a.pecas) {
         if (p.fixa) continue;
         const itens = pecas.get(p.id);
         const s = situacao(itens);
-        if (s === 'vazio') continue;
         const g = construirPeca(p, mats);
-        if (s === 'falta') virarFantasma(g, fantasma, contorno);
-        g.userData = { itens, area: a.id, nome: itens!.map((i) => i.nome).join(' + '), comprado: s === 'comprado' };
+        if (s === 'vazio') {
+          // Fora da lista: aparece como decoração, para o cômodo não ficar vazio.
+          virarArgila(g, mats.argila);
+          g.userData = { area: a.id };
+        } else {
+          if (s === 'falta') virarFantasma(g, fantasma, contorno);
+          g.userData = { itens, area: a.id, nome: itens!.map((i) => i.nome).join(' + '), comprado: s === 'comprado' };
+          tocaveis.push(g);
+        }
         if (DE_PAREDE.has(p.modelo)) deParede.push({ g, frente: p.frente ?? 'z+', centro: new THREE.Vector2(p.ret.x + p.ret.w / 2, p.ret.z + p.ret.d / 2) });
         lista.add(g);
-        tocaveis.push(g);
       }
+      for (const mod of a.modulos ?? []) construirModulo(a, mod, modulos.get(mod.id) ?? []);
       pacotinhos(a, pequenos);
     }
+    // O módulo que estava aberto continua aberto, com o conteúdo atualizado.
+    if (aberto) {
+      const est = estados.get(aberto);
+      if (est) opcoes.aoAbrirModulo?.({ id: aberto, area: est.area, nome: est.nome, itens: est.itens });
+      else {
+        aberto = null;
+        opcoes.aoAbrirModulo?.(null);
+      }
+    }
     pedirQuadro();
+  }
+
+  // ---------- móveis planejados: armários, gavetas e bancadas ----------
+
+  interface EstadoModulo {
+    area: AreaId;
+    nome: string;
+    itens: Item[];
+    /** Para onde a câmera vai quando ele abre. */
+    olhar: { alvo: THREE.Vector3; posicao: THREE.Vector3 };
+    atual: number;
+    alvo: number;
+    aplicar: (v: number) => void;
+  }
+  const estados = new Map<string, EstadoModulo>();
+  let aberto: string | null = null;
+  const lembrarAberto = new Map<string, number>();
+
+  function construirModulo(a: Area, mod: Modulo, itens: Item[]) {
+    const chave = `${a.id}/${mod.id}`;
+    const frente = mod.frente;
+    const deLado = frente === 'x+' || frente === 'x-';
+    const w = deLado ? mod.ret.d : mod.ret.w;
+    const d = deLado ? mod.ret.w : mod.ret.d;
+    const h = mod.h;
+    const t = 0.018;
+    const g = new THREE.Group();
+    g.rotation.y = ROTACAO[frente];
+    g.position.set(mod.ret.x + mod.ret.w / 2, mod.y, mod.ret.z + mod.ret.d / 2);
+    g.userData = { area: a.id, modulo: chave };
+    lista.add(g);
+
+    // Frente de madeira embaixo; branca nos aéreos e nos móveis altos. Puxador dourado.
+    const corFrente = mod.y >= 1.4 || h > 1.2 ? mats.branco : mats.frente;
+    // Conteúdo: no modo geral não aparece (armário fechado e cortado a 1,1 m).
+    const mostrarConteudo = !geral || mod.tipo === 'superficie';
+
+    const colocar = (pai: THREE.Object3D, larg: number, fundo: number, niveis: { y: number; hMax: number }[], z0 = 0) => {
+      if (!mostrarConteudo || itens.length === 0) return;
+      const n = itens.length;
+      const c = THREE.MathUtils.clamp(Math.sqrt((larg * fundo * niveis.length) / n) * 0.92, 0.06, 0.22);
+      const cols = Math.max(1, Math.floor(larg / c));
+      const linhas = Math.max(1, Math.floor(fundo / c));
+      const porNivel = cols * linhas;
+      itens.forEach((item, i) => {
+        const nivel = niveis[Math.floor(i / porNivel) % niveis.length];
+        const camada = Math.floor(i / (porNivel * niveis.length));
+        const resto = i % porNivel;
+        const mini = miniatura(miniaturaDo(item.nome), c * 0.9, nivel.hMax, mats, item.nome);
+        mini.position.set(
+          -larg / 2 + ((resto % cols) + 0.5) * (larg / cols),
+          nivel.y + camada * c * 0.35,
+          z0 - fundo / 2 + (Math.floor(resto / cols) + 0.5) * (fundo / linhas),
+        );
+        if (!item.comprado) virarFantasma(mini, fantasma, contorno);
+        mini.userData = { itens: [item], area: a.id, nome: item.nome, comprado: !!item.comprado };
+        pai.add(mini);
+        tocaveis.push(mini);
+      });
+    };
+
+    let aplicar: (v: number) => void = () => {};
+    if (mod.tipo === 'superficie') {
+      colocar(g, w * 0.92, d * 0.9, [{ y: 0, hMax: h }]);
+    } else {
+      // Caixa do móvel, aberta na frente.
+      caixa(g, w, h, t, mats.interno, 0, 0, -d / 2 + t / 2);
+      caixa(g, t, h, d, mats.interno, -w / 2 + t / 2);
+      caixa(g, t, h, d, mats.interno, w / 2 - t / 2);
+      caixa(g, w - 2 * t, t, d - t, mats.interno, 0, 0, t / 2);
+      caixa(g, w - 2 * t, t, d - t, mats.interno, 0, h - t, t / 2);
+      const puxadorAlto = Math.min(0.2, h * 0.4);
+      if (mod.tipo === 'porta') {
+        const n = mod.prateleiras ?? 0;
+        const niveis: { y: number; hMax: number }[] = [];
+        const vao = (h - 2 * t) / (n + 1);
+        for (let k = 0; k <= n; k++) {
+          if (k > 0) caixa(g, w - 2 * t, t, d - t - 0.02, mats.interno, 0, t + k * vao - t, t / 2);
+          niveis.push({ y: t + k * vao, hMax: vao - t - 0.01 });
+        }
+        colocar(g, w - 2 * t - 0.03, d - t - 0.06, niveis, t / 2);
+        // Porta presa na dobradiça; abre girando para fora.
+        const esq = mod.dobradica !== 'dir';
+        const eixo = new THREE.Group();
+        eixo.position.set(esq ? -w / 2 : w / 2, 0, d / 2);
+        g.add(eixo);
+        const folha = caixa(eixo, w - 0.006, h - 0.006, 0.018, corFrente, esq ? w / 2 : -w / 2, 0.003, 0.009);
+        folha.userData = {};
+        const yPux = mod.y >= 1.4 ? 0.05 : h - 0.05 - puxadorAlto;
+        caixa(eixo, 0.016, puxadorAlto, 0.02, mats.dourado, esq ? w - 0.05 : -(w - 0.05), yPux, 0.028);
+        aplicar = (v) => (eixo.rotation.y = (esq ? -1 : 1) * 1.9 * v);
+      } else {
+        // Gaveta: corre para fora levando o que tem dentro.
+        const gaveta = new THREE.Group();
+        g.add(gaveta);
+        const larg = w - 2 * t - 0.012;
+        const alturaParede = h * 0.55;
+        caixa(gaveta, larg, 0.012, d - 0.04, mats.interno, 0, t + 0.004, -0.01);
+        for (const sx of [-1, 1]) caixa(gaveta, 0.012, alturaParede, d - 0.04, mats.interno, sx * (larg / 2 - 0.006), t + 0.004, -0.01);
+        caixa(gaveta, larg, alturaParede, 0.012, mats.interno, 0, t + 0.004, -d / 2 + 0.03);
+        caixa(gaveta, w - 0.006, h - 0.006, 0.018, corFrente, 0, 0.003, d / 2 + 0.009);
+        caixa(gaveta, Math.min(0.24, w * 0.4), 0.016, 0.02, mats.dourado, 0, h - 0.06, d / 2 + 0.028);
+        colocar(gaveta, larg - 0.04, d - 0.1, [{ y: t + 0.016, hMax: alturaParede * 0.9 }], -0.02);
+        aplicar = (v) => (gaveta.position.z = d * 0.72 * v);
+      }
+    }
+    const anterior = lembrarAberto.get(chave) ?? 0;
+    aplicar(anterior);
+    // Câmera para olhar dentro: de frente, um pouco de lado e, na gaveta, de
+    // cima. No armário com prateleiras, mira a de baixo, que é a primeira a
+    // encher. Nunca sai de dentro do cômodo.
+    const [dx, dz] = DIRECAO[frente];
+    const vao = h / ((mod.prateleiras ?? 0) + 1);
+    // Armário alto (limpeza, cabideiro): mira na altura das coisas, que ficam embaixo.
+    const alturaAlvo = mod.tipo === 'porta' ? (h > 1.2 ? 0.55 : Math.min(h / 2, vao * 0.7)) : mod.tipo === 'superficie' ? 0.1 : h / 2;
+    const centro = new THREE.Vector3(mod.ret.x + mod.ret.w / 2 - LARGURA / 2, mod.y + alturaAlvo, mod.ret.z + mod.ret.d / 2 - FUNDO / 2);
+    const [afasta, sobe] = mod.tipo === 'gaveta' ? [0.95, 0.85] : mod.tipo === 'superficie' ? [0.85, 0.7] : h > 1.2 ? [1.9, 0.55] : [1.0, 0.35];
+    const alvoOlhar = centro.clone().add(new THREE.Vector3(dx, 0, dz).multiplyScalar(mod.tipo === 'gaveta' ? 0.3 : 0.05));
+    const posOlhar = centro.clone().add(new THREE.Vector3(dx * afasta - dz * 0.3, sobe, dz * afasta + dx * 0.3));
+    const margem = 0.2;
+    posOlhar.x = THREE.MathUtils.clamp(posOlhar.x, a.ret.x + margem - LARGURA / 2, a.ret.x + a.ret.w - margem - LARGURA / 2);
+    posOlhar.z = THREE.MathUtils.clamp(posOlhar.z, a.ret.z + margem - FUNDO / 2, a.ret.z + a.ret.d - margem - FUNDO / 2);
+    estados.set(chave, {
+      area: a.id, nome: mod.nome, itens, olhar: { alvo: alvoOlhar, posicao: posOlhar },
+      atual: anterior, alvo: aberto === chave ? 1 : 0, aplicar,
+    });
+    if (mod.tipo !== 'superficie') tocaveis.push(g);
+  }
+
+  /** Abre o módulo (fechando o que estava aberto) ou fecha, se já estava aberto. */
+  function alternarModulo(chave: string) {
+    if (aberto && estados.has(aberto)) estados.get(aberto)!.alvo = 0;
+    if (aberto === chave) {
+      aberto = null;
+      opcoes.aoAbrirModulo?.(null);
+    } else {
+      aberto = chave;
+      const est = estados.get(chave)!;
+      est.alvo = 1;
+      voarPara(est.olhar.alvo, est.olhar.posicao);
+      opcoes.aoAbrirModulo?.({ id: chave, area: est.area, nome: est.nome, itens: est.itens });
+    }
+    pedirQuadro();
+  }
+
+  /** Um passo da animação de abrir e fechar. Devolve true se ainda falta mexer. */
+  function animarModulos(): boolean {
+    let mexendo = false;
+    for (const [chave, est] of estados) {
+      const dif = est.alvo - est.atual;
+      if (Math.abs(dif) < 0.002) {
+        if (est.atual !== est.alvo) {
+          est.atual = est.alvo;
+          est.aplicar(est.atual);
+        }
+      } else {
+        est.atual += movimentoReduzido ? dif : dif * 0.2;
+        est.aplicar(est.atual);
+        mexendo = true;
+      }
+      lembrarAberto.set(chave, est.atual);
+    }
+    return mexendo;
   }
 
   /** Itens pequenos: um pacotinho por item, em fileiras sobre o apoio. */
@@ -738,6 +1055,15 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     return longe;
   }
 
+  // Voo da câmera até um armário aberto.
+  let voo: { t0: number; deAlvo: THREE.Vector3; paraAlvo: THREE.Vector3; dePos: THREE.Vector3; paraPos: THREE.Vector3 } | null = null;
+  function voarPara(paraAlvo: THREE.Vector3, paraPos: THREE.Vector3) {
+    voo = { t0: performance.now(), deAlvo: controles.target.clone(), paraAlvo, dePos: camera.position.clone(), paraPos };
+    mexeu = true;
+    entrada = 1;
+    pedirQuadro();
+  }
+
   // Entrada: a câmera chega de mais longe, devagar.
   let entrada = movimentoReduzido ? 1 : 0;
   let inicioEntrada = 0;
@@ -753,7 +1079,8 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     camera.updateProjectionMatrix();
     if (!mexeu) azimute = escolherAzimute();
     distancia = distanciaIdeal();
-    controles.minDistance = distancia * 0.4;
+    // Dá para chegar bem perto: é assim que se olha dentro de uma gaveta.
+    controles.minDistance = Math.min(distancia * 0.4, 0.5);
     controles.maxDistance = distancia * 1.6;
     if (!mexeu) posicionar(entrada < 1 ? distancia * 1.5 : distancia);
     pedirQuadro();
@@ -866,7 +1193,16 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
       if (!mexeu) posicionar(distancia * (1.5 - 0.5 * suave));
       continuar = entrada < 1;
     }
+    if (voo) {
+      const k = movimentoReduzido ? 1 : Math.min(1, (performance.now() - voo.t0) / 650);
+      const e = 1 - Math.pow(1 - k, 3);
+      controles.target.lerpVectors(voo.deAlvo, voo.paraAlvo, e);
+      camera.position.lerpVectors(voo.dePos, voo.paraPos, e);
+      if (k >= 1) voo = null;
+      continuar = true;
+    }
     if (controles.update()) continuar = true;
+    if (animarModulos()) continuar = true;
     esconderParedesDaFrente();
     renderer.render(cena, camera);
     posicionarRotulos();
@@ -882,7 +1218,7 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
   const ponteiro = new THREE.Vector2();
   let inicioToque: { x: number; y: number } | null = null;
 
-  function acertar(e: PointerEvent): { area?: AreaId; peca?: THREE.Object3D } {
+  function acertar(e: PointerEvent): { area?: AreaId; peca?: THREE.Object3D; modulo?: string } {
     const r = tela.getBoundingClientRect();
     ponteiro.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     raio.setFromCamera(ponteiro, camera);
@@ -893,7 +1229,7 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
       let o: THREE.Object3D | null = hit.object;
       while (o && !o.userData.area) o = o.parent;
       if (!o) continue;
-      return { area: o.userData.area, peca: o.userData.itens ? o : undefined };
+      return { area: o.userData.area, peca: o.userData.itens ? o : undefined, modulo: o.userData.modulo };
     }
     return {};
   }
@@ -909,15 +1245,21 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
 
   function aoMover(e: PointerEvent) {
     if (e.pointerType !== 'mouse' || e.buttons) return;
-    const { area: a, peca } = acertar(e);
+    const { area: a, peca, modulo } = acertar(e);
     if (geral) {
       const ok = a && infos.find((i) => i.id === a)?.temComodo;
       realcar(ok ? a! : null);
       tela.style.cursor = ok ? 'pointer' : 'grab';
       return;
     }
-    tela.style.cursor = peca ? 'pointer' : 'grab';
-    if (peca) {
+    tela.style.cursor = peca || modulo ? 'pointer' : 'grab';
+    if (modulo && !peca) {
+      const est = estados.get(modulo);
+      const r = host.getBoundingClientRect();
+      dica.textContent = est ? `${est.nome} · ${est.itens.length} ${est.itens.length === 1 ? 'item' : 'itens'}` : '';
+      dica.style.transform = `translate(${e.clientX - r.left + 14}px, ${e.clientY - r.top + 14}px)`;
+      dica.hidden = !est;
+    } else if (peca) {
       const r = host.getBoundingClientRect();
       dica.textContent = `${peca.userData.nome} · ${peca.userData.comprado ? 'comprado' : 'falta comprar'}`;
       dica.style.transform = `translate(${e.clientX - r.left + 14}px, ${e.clientY - r.top + 14}px)`;
@@ -934,9 +1276,13 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
     const arrastou = Math.hypot(e.clientX - inicioToque.x, e.clientY - inicioToque.y) > 6;
     inicioToque = null;
     if (arrastou) return;
-    const { area: a, peca } = acertar(e);
+    const { area: a, peca, modulo } = acertar(e);
     if (geral) {
       if (a && infos.find((i) => i.id === a)?.temComodo) opcoes.aoEscolherArea?.(a);
+      return;
+    }
+    if (modulo && !peca) {
+      alternarModulo(modulo);
       return;
     }
     if (peca) {
@@ -983,7 +1329,11 @@ export function criarPlanta(host: HTMLElement, opcoes: Opcoes): Planta {
       controles.update();
       pedirQuadro();
     },
+    fecharModulo() {
+      if (aberto) alternarModulo(aberto);
+    },
     recentrar() {
+      voo = null;
       mexeu = false;
       entrada = 1;
       controles.target.copy(alvo);

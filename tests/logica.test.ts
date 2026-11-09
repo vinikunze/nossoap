@@ -127,14 +127,16 @@ describe('sugestões', () => {
   });
 });
 
-import { AREAS, area, pecaDoItem, distribuir, situacao, PAREDES, PORTAS, JANELAS, LARGURA, FUNDO } from '../shared/planta';
+import { AREAS, area, pecaDoItem, moduloDoItem, miniaturaDo, distribuir, situacao, PAREDES, PORTAS, JANELAS, LARGURA, FUNDO } from '../shared/planta';
 
 describe('planta', () => {
   const peca = (a: string, nome: string) => pecaDoItem(area(a)!, nome)?.id;
 
   it('cada item vai para o móvel certo', () => {
     expect(peca('cozinha', 'Geladeira Brastemp Frost Free')).toBe('geladeira');
-    expect(peca('cozinha', 'Fogão 4 bocas')).toBe('fogao');
+    expect(peca('cozinha', 'Fogão 4 bocas')).toBe('cooktop');
+    expect(peca('cozinha', 'Cooktop de indução')).toBe('cooktop');
+    expect(peca('cozinha', 'Forno elétrico')).toBe('forno');
     expect(peca('cozinha', 'Micro-ondas')).toBe('microondas');
     expect(peca('servico', 'Máquina de lavar 12kg')).toBe('lavadora');
     expect(peca('sala', 'Mesa de centro')).toBe('mesa_centro');
@@ -167,7 +169,8 @@ describe('planta', () => {
     const lencol = item({ nome: 'Jogo de lençol' });
     const d = distribuir(area('quarto1')!, [cama, colchao, lencol]);
     expect(d.pecas.get('cama')?.length).toBe(2);
-    expect(d.pequenos).toEqual([lencol]);
+    expect(d.modulos.get('cama')).toEqual([lencol]);
+    expect(d.pequenos).toEqual([]);
     expect(situacao(d.pecas.get('cama'))).toBe('falta');
     expect(situacao([cama])).toBe('comprado');
     expect(situacao(undefined)).toBe('vazio');
@@ -200,6 +203,65 @@ describe('planta', () => {
           ? p[1] === p[3] && p[1] === z1 && Math.min(p[0], p[2]) <= Math.min(x1, x2) && Math.max(p[0], p[2]) >= Math.max(x1, x2)
           : p[0] === p[2] && p[0] === x1 && Math.min(p[1], p[3]) <= Math.min(z1, z2) && Math.max(p[1], p[3]) >= Math.max(z1, z2));
       expect(parede, `janela ${j.trecho}`).toBeDefined();
+    }
+  });
+
+  it('a lista do papel vai para os armários e gavetas certos', () => {
+    const lugar = (a: string, nome: string) => pecaDoItem(area(a)!, nome)?.id ?? moduloDoItem(area(a)!, nome)?.id;
+    const esperado: [string, string, string][] = [
+      ['cozinha', 'Talheres', 'talheres'], ['cozinha', 'Kit faca de churrasco', 'talheres'], ['cozinha', 'Colher de sorvete', 'talheres'],
+      ['cozinha', 'Abridor de lata', 'talheres'], ['cozinha', 'Cortador de pizza', 'talheres'], ['cozinha', 'Organizador de gavetas', 'talheres'],
+      ['cozinha', 'Colher grande de servir', 'utensilios'], ['cozinha', 'Concha e escumadeira', 'utensilios'], ['cozinha', 'Fuê (batedor)', 'utensilios'],
+      ['cozinha', 'Copo medidor', 'utensilios'], ['cozinha', 'Espremedor de limão', 'utensilios'], ['cozinha', 'Ralador', 'utensilios'],
+      ['cozinha', 'Pano de prato', 'panos'], ['cozinha', 'Pano escorredor de louça', 'panos'], ['cozinha', 'Descanso de panela', 'panos'],
+      ['cozinha', 'Luva térmica de silicone', 'panos'],
+      ['cozinha', 'Escorredor de louça', 'lado_pia'], ['cozinha', 'Porta-detergente', 'lado_pia'],
+      ['cozinha', 'Escorredor de macarrão', 'panelas'], ['cozinha', 'Panela de pressão', 'panelas'], ['cozinha', 'Kit de panelas de indução', 'panelas'],
+      ['cozinha', 'Frigideira', 'panelas'], ['cozinha', 'Jogo de panelas', 'panelas'],
+      ['cozinha', 'Travessa de sobremesa', 'formas'], ['cozinha', 'Forma de pudim', 'formas'], ['cozinha', 'Tábua de carne', 'formas'], ['cozinha', 'Marinex com tampa', 'formas'],
+      ['cozinha', 'Pratos de sobremesa', 'loucas'], ['cozinha', 'Bowls', 'loucas'], ['cozinha', 'Tigela', 'loucas'],
+      ['cozinha', 'Jogo de copos', 'copos'], ['cozinha', 'Jogo de xícaras', 'copos'], ['cozinha', 'Jogo de taças', 'copos'], ['cozinha', 'Canecas', 'copos'],
+      ['cozinha', 'Pote hermético', 'potes'], ['cozinha', 'Lata hermética de tempero', 'potes'], ['cozinha', 'Porta-presunto e queijo', 'potes'], ['cozinha', 'Saleiro', 'potes'],
+      ['cozinha', 'Airfryer', 'bancada'], ['cozinha', 'Chaleira elétrica', 'bancada'], ['cozinha', 'Mixer de cappuccino', 'bancada'], ['cozinha', 'Porta-papel toalha', 'bancada'],
+      ['cozinha', 'Garrafa térmica', 'bancada'], ['cozinha', 'Lixeira de cozinha', 'pia'], ['cozinha', 'Balança digital de cozinha', 'diversos'],
+      ['cozinha', 'Geladeira', 'geladeira'], ['cozinha', 'Micro-ondas', 'microondas'],
+      ['quarto1', 'Jogo de lençol de casal', 'cama'], ['quarto1', 'Colcha aveludada preta', 'cama'], ['quarto1', 'Travesseiros', 'maleiro'],
+      ['quarto1', 'Tapete passadeira', 'tapete'], ['quarto1', 'Cortina', 'cortina'],
+      ['bwc', 'Toalhas de banho', 'gabinete'], ['bwc', 'Lixeira de banheiro', 'lixeira'],
+      ['servico', 'Máquina lava e seca', 'lavadora'], ['servico', 'Varal retrátil', 'varal'], ['servico', 'Porta-sabão em pó', 'produtos'],
+      ['servico', 'Porta-amaciante', 'produtos'], ['servico', 'Prendedor de roupa', 'organizadores'], ['servico', 'Cestos organizadores', 'organizadores'],
+      ['servico', 'Cesto de roupas', 'limpeza'], ['servico', 'Mesa de passar roupa', 'limpeza'], ['servico', 'Vassoura', 'limpeza'], ['servico', 'Aspirador de pó', 'limpeza'],
+      ['sala', 'Sofá', 'sofa'], ['sala', 'Televisão', 'tv'], ['sala', 'Painel', 'rack'],
+    ];
+    for (const [a, nome, id] of esperado) expect(lugar(a, nome), `${a}: ${nome}`).toBe(id);
+  });
+
+  it('a mesa com cadeiras acende a mesa e as cadeiras', () => {
+    const d = distribuir(area('sala')!, [item({ nome: 'Mesa de jantar com 6 cadeiras' })]);
+    expect(d.pecas.get('mesa')?.length).toBe(1);
+    expect(d.pecas.get('cadeiras')?.length).toBe(1);
+  });
+
+  it('cada coisa ganha a miniatura certa', () => {
+    expect(miniaturaDo('Pratos de sobremesa')).toBe('prato');
+    expect(miniaturaDo('Jogo de copos')).toBe('copo');
+    expect(miniaturaDo('Jogo de xícaras')).toBe('xicara');
+    expect(miniaturaDo('Talheres')).toBe('talher');
+    expect(miniaturaDo('Pano de prato')).toBe('pano');
+    expect(miniaturaDo('Panela de pressão')).toBe('panela');
+    expect(miniaturaDo('Forma de bolo')).toBe('forma');
+    expect(miniaturaDo('Jogo de lençol de casal')).toBe('textil');
+    expect(miniaturaDo('Travesseiros')).toBe('travesseiro');
+    expect(miniaturaDo('Vassoura')).toBe('cabo');
+    expect(miniaturaDo('Coisa qualquer')).toBe('caixa');
+  });
+
+  it('módulos cabem no apartamento e cada cômodo com módulos tem um padrão válido', () => {
+    for (const a of AREAS) {
+      for (const m of a.modulos ?? []) {
+        expect(m.ret.x >= 0 && m.ret.z >= 0 && m.ret.x + m.ret.w <= LARGURA && m.ret.z + m.ret.d <= FUNDO, `${a.id}/${m.id}`).toBe(true);
+      }
+      if (a.moduloPadrao) expect(a.modulos?.some((m) => m.id === a.moduloPadrao), a.id).toBe(true);
     }
   });
 });

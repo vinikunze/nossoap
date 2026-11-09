@@ -97,6 +97,21 @@ redesenhada em metros em `shared/planta.ts`.
   chão (entrada, banheiro, quarto de casal, quarto de visita); janelas em azul
   na lavanderia, sala, banheiro e nos dois quartos. Tudo em `PORTAS` e
   `JANELAS` em `shared/planta.ts`.
+- **Apartamento mobiliado (pedido do Vini, 09/11/2026)**: cozinha planejada
+  na parede da esquerda (geladeira, torre com forno e micro-ondas, cooktop com
+  armário de panelas, gaveteiro, pia e armários aéreos), guarda-roupa
+  planejado no quarto, gabinete no banheiro, armários de produtos e de
+  limpeza na lavanderia.
+  - **Armários e gavetas abrem com um toque**: a câmera chega perto, a porta
+    gira ou a gaveta corre, e as coisas da lista aparecem lá dentro em
+    miniatura (pratos empilhados, copos, talheres, panos dobrados…). Embaixo
+    da maquete aparece a lista do que vai ali; tocar abre o item.
+  - **Onde cada coisa vai** sai do nome: "Talheres" na gaveta de talheres,
+    "Pano de prato" na de panos, "Escorredor de louça" ao lado da pia. O que
+    não combina com nada vai para o módulo padrão do cômodo (na cozinha, o
+    armário de diversos). Regras e testes em `shared/planta.ts`.
+  - **Móvel fora da lista** aparece como decoração, em branco de maquete, para
+    o apartamento não ficar vazio.
 - O Three.js só é baixado quando a maquete aparece (145 KB comprimido); a
   lista sozinha tem 40 KB.
 
